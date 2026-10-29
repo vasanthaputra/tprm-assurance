@@ -1,0 +1,22 @@
+# reliance — review policy for the vendor register check.
+# Every rule names its source. Values marked ORG POLICY are choices an organisation
+# makes for itself (the regulators deliberately do not set them); change them here.
+
+as_of: null            # review date (YYYY-MM-DD). null = today.
+
+review_cadence_months:  # ORG POLICY — default taken from the GRCWorks Labs vendor-register
+  CRITICAL: 12          # exercise (MIT licence): critical/high every 12 months, medium/low every 24.
+  HIGH: 12              # Regulators require periodic, risk-based reassessment but set no fixed
+  MEDIUM: 24            # interval (Interagency Guidance on Third-Party Relationships, 88 FR 37920,
+  LOW: 24               # June 9 2023: "periodically conducting risk assessments for each
+                        # third-party relationship").
+
+assurance:
+  bridge_letter_after_months: 3    # Sushegaad TPRM skill, soc2-report-review.md (MIT):
+                                   # "If the report period ended more than ~3 months ago,
+                                   # request a bridge (gap) letter."
+  stale_after_months: 15           # same source: "A report older than ~15 months with no
+                                   # successor in flight is a red flag."
+  type2_required_for: [CRITICAL, HIGH]   # same source, red-flag list: "Type I offered where
+                                         # Type II expected". Which tiers "expect" Type II is
+                                         # ORG POLICY.

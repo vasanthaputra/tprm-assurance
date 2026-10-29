@@ -1,0 +1,16 @@
+# Planted problems in the synthetic sample, reviewed as of 2026-10-29. Every row here must be found, and nothing else.
+# Look-alikes that must NOT be flagged: OfficeSuite (report ended exactly 3 months ago), TravelEase (LOW, 20 months < 24),
+# HireBoard (report ended exactly 15 months ago, bridge letter on file), BackupBox (assessed exactly 12 months ago),
+# MonitorPlus and PrintHub (clean).
+vendor,rule
+CloudStore EU,NOT_IN_REGISTER
+TravelEase APAC,NOT_IN_REGISTER
+CloudStore,NO_DPA
+SurveyNow,NO_DPA
+PayrollPro,REVIEW_OVERDUE
+CleanCo,REVIEW_OVERDUE
+PayrollPro,BRIDGE_LETTER_NEEDED
+SecureShred,NEVER_ASSESSED
+LegalLink,TYPE1_WHERE_TYPE2
+ExpenseIt,REPORT_STALE
+AuditPartners,NO_ASSURANCE_REPORT
