@@ -96,6 +96,14 @@ def test_decision_does_not_leak_to_a_different_report(fixture, tmp_path):
     assert apply_decisions(propose(fixture, ctx), log)[first.index(target)].status == "APPROVED"
 
 
+def test_colliding_provider_names_get_distinct_ids(fixture):
+    ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
+    ex = json.loads(json.dumps(fixture))
+    ex["subservice_orgs"]["values"] = ["AWS (EU)", "AWS/EU", "AWS - EU"]   # all slug to "aws-eu"
+    ids = [f.id for f in propose(ex, ctx) if f.rule == "CARVE_OUT_NO_ASSURANCE"]
+    assert len(ids) == 3 and len(set(ids)) == 3
+
+
 def test_carve_out_ids_name_the_provider(fixture):
     ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
     ids = [f.id for f in propose(fixture, ctx) if f.rule == "CARVE_OUT_NO_ASSURANCE"]
