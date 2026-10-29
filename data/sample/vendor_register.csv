@@ -1,0 +1,17 @@
+# SYNTHETIC SAMPLE DATA. Fictional vendors (names from GRCWorks Labs, MIT). Not real assessment results.
+# Columns follow SOURCES.md S1 (inventory, criticality), S2 (personal data / DPA), S3 (SOC report type, period end, bridge letter).
+vendor,service,criticality,personal_data,dpa_signed,last_assessed,report_type,report_period_end,bridge_letter
+OfficeSuite,Email and documents,CRITICAL,yes,yes,2026-03-10,SOC2_TYPE2,2026-06-30,no
+CloudStore,File sharing,HIGH,yes,no,2026-01-15,SOC2_TYPE2,2026-03-31,yes
+PayrollPro,Payroll,CRITICAL,yes,yes,2025-06-01,SOC2_TYPE2,2026-05-31,no
+TravelEase,Business travel,LOW,yes,yes,2025-02-01,NONE,,
+SecureShred,Paper shredding,MEDIUM,no,no,,NONE,,
+LegalLink,Outside counsel,HIGH,yes,yes,2026-04-01,SOC2_TYPE1,2026-09-30,no
+PrintHub,Printing,LOW,no,no,2025-12-01,NONE,,
+HireBoard,Job ads,MEDIUM,yes,yes,2025-03-01,SOC2_TYPE2,2025-06-30,yes
+ExpenseIt,Expenses,HIGH,yes,yes,2026-02-01,SOC2_TYPE2,2025-04-30,yes
+AuditPartners,External audit,CRITICAL,yes,yes,2026-05-01,NONE,,
+SurveyNow,Customer surveys,MEDIUM,yes,no,2026-01-01,NONE,,
+CleanCo,Facilities,LOW,no,no,2024-09-01,NONE,,
+MonitorPlus,Uptime monitoring,HIGH,no,no,2025-11-15,SOC2_TYPE2,2026-08-31,no
+BackupBox,Offsite backup,CRITICAL,yes,yes,2025-10-28,SOC2_TYPE2,2026-03-31,yes
