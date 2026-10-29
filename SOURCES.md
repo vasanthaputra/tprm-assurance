@@ -1,6 +1,6 @@
 # Sources
 
-Every rule in `reliance` comes from one of these. Nothing is invented. Where a source leaves a value to the organisation, `policy.yaml` marks it **ORG POLICY**.
+Every rule in Vendor-Rely comes from one of these. Nothing is invented. Where a source leaves a value to the organisation, `policy.yaml` marks it **ORG POLICY**.
 
 | # | Source | What we take from it | Retrieved |
 |---|---|---|---|
