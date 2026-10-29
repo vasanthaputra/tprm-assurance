@@ -5,7 +5,7 @@
   python -m tprm_assurance.cli soc2 extract <report.pdf> --out extraction.json [--extractor rules|anthropic]
   python -m tprm_assurance.cli soc2 prompt  <report.pdf> --out prompt.txt       (copy-paste path, no API key)
   python -m tprm_assurance.cli soc2 review  <extraction.json> --context ctx.yaml [--decisions log.jsonl] [--out F]
-  python -m tprm_assurance.cli soc2 decide  <finding_id> approve|reject --reviewer NAME [--note ...] [--decisions log.jsonl]
+  python -m tprm_assurance.cli soc2 decide  <extraction.json> <finding_id> approve|reject --reviewer NAME [--note ...] [--decisions log.jsonl]
 """
 from __future__ import annotations
 
@@ -58,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     rv.add_argument("--decisions", type=Path, default=Path("decisions.jsonl"))
     rv.add_argument("--out", type=Path)
     dc = soc.add_parser("decide")
+    dc.add_argument("extraction_json", type=Path, help="the extraction the finding came from (binds the decision to it)")
     dc.add_argument("finding_id")
     dc.add_argument("decision", choices=["approve", "reject"])
     dc.add_argument("--reviewer", required=True)
@@ -95,9 +96,10 @@ def main(argv: list[str] | None = None) -> int:
         findings = apply_decisions(propose(ex_data, ctx, load_policy(args.policy)), args.decisions)
         _emit(soc2_md(ex_data, findings, ctx), args.out, len(findings))
     elif args.soc2_cmd == "decide":
+        from .soc2.reliance import report_hash
         from .soc2.review import decide
-        entry = decide(args.decisions, args.finding_id, "APPROVED" if args.decision == "approve" else "REJECTED",
-                       args.reviewer, args.note)
+        h = report_hash(json.loads(args.extraction_json.read_text(encoding="utf-8")))
+        entry = decide(args.decisions, args.finding_id, args.decision, args.reviewer, h, args.note)
         print(json.dumps(entry))
     return 0
 

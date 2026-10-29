@@ -64,17 +64,43 @@ def test_human_gate_is_append_only(fixture, tmp_path):
     ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
     findings = propose(fixture, ctx)
     assert all(f.status == "PROPOSED" for f in findings)
-    fid = findings[0].id
-    decide(log, fid, "approve", "reviewer-a", "confirmed on page 1")
-    decide(log, fid, "REJECTED", "reviewer-b", "changed mind")
+    fid, h = findings[0].id, findings[0].report_hash
+    decide(log, fid, "approve", "reviewer-a", h, "confirmed on page 1")
+    decide(log, fid, "REJECTED", "reviewer-b", h, "changed mind")
     assert len(log.read_text(encoding="utf-8").splitlines()) == 2   # both kept
-    assert load_decisions(log)[fid]["decision"] == "REJECTED"         # latest wins
+    assert load_decisions(log)[(h, fid)]["decision"] == "REJECTED"    # latest wins
     applied = apply_decisions(propose(fixture, ctx), log)
     assert applied[0].status == "REJECTED" and applied[1].status == "PROPOSED"
     with pytest.raises(ValueError):
-        decide(log, fid, "maybe", "reviewer-a")
+        decide(log, fid, "maybe", "reviewer-a", h)
     with pytest.raises(ValueError):
-        decide(log, fid, "approve", "   ")
+        decide(log, fid, "approve", "   ", h)
+    with pytest.raises(ValueError):
+        decide(log, fid, "approve", "reviewer-a", "")
+
+
+def test_decision_does_not_leak_to_a_different_report(fixture, tmp_path):
+    """Same file name, same finding id, different content: the old decision must not apply."""
+    log = tmp_path / "decisions.jsonl"
+    ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
+    first = propose(fixture, ctx)
+    target = next(f for f in first if f.rule == "CARVE_OUT_NO_ASSURANCE")
+    decide(log, target.id, "approve", "reviewer-a", target.report_hash)
+
+    other = json.loads(json.dumps(fixture))               # same source_file ...
+    other["period"]["end"] = "2025-04-26"                  # ... different report content
+    second = propose(other, ctx)
+    same_id = next(f for f in second if f.id == target.id)
+    assert same_id.report_hash != target.report_hash
+    assert apply_decisions(second, log)[second.index(same_id)].status == "PROPOSED"
+    assert apply_decisions(propose(fixture, ctx), log)[first.index(target)].status == "APPROVED"
+
+
+def test_carve_out_ids_name_the_provider(fixture):
+    ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
+    ids = [f.id for f in propose(fixture, ctx) if f.rule == "CARVE_OUT_NO_ASSURANCE"]
+    assert any(i.endswith(":amazon-web-services-aws") for i in ids)
+    assert len(set(ids)) == 5
 
 
 # Code-path checks on tiny synthetic page strings (not a real report).
