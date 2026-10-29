@@ -6,8 +6,11 @@ Nothing becomes a finding until a human approves it (see review.py).
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -33,12 +36,24 @@ RULES = {
 }
 
 
+def report_hash(ex: dict) -> str:
+    """Content hash of the extraction. Decisions are bound to it, so a decision made on one
+    report can never be applied to a different report that happens to share a file name."""
+    canon = json.dumps({k: v for k, v in ex.items() if k not in ("source_file", "extractor")}, sort_keys=True)
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:16]
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40] or "x"
+
+
 @dataclass
 class Finding:
     id: str
     rule: str
     detail: str
     page: int | None
+    report_hash: str
     status: str = "PROPOSED"   # PROPOSED -> APPROVED | REJECTED (by a human)
 
     @property
@@ -65,13 +80,16 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
     """Apply the reliance rules. Thresholds come from policy.yaml (assurance section)."""
     a = (policy or {}).get("assurance", {"bridge_letter_after_months": 3, "stale_after_months": 15})
     today = ctx["as_of"]
-    tag = Path(ex.get("source_file") or "report").stem
+    tag = _slug(Path(ex.get("source_file") or "report").stem)
+    h = report_hash(ex)
     found: list[Finding] = []
     n = Counter()
 
-    def add(rule: str, detail: str, page: int | None):
+    def add(rule: str, detail: str, page: int | None, key: str | None = None):
+        # The id names what the finding is about (a stable key, not a position), and the
+        # hash ties it to this exact extraction.
         n[rule] += 1
-        found.append(Finding(f"{tag}:{rule}:{n[rule]}", rule, detail, page))
+        found.append(Finding(f"{tag}:{rule}:{key or n[rule]}", rule, detail, page, h))
 
     rt = ex.get("report_type", {})
     if rt.get("value") == "SOC2_TYPE1" and ctx["expect_type2"]:
@@ -107,7 +125,7 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
     held = {s.lower() for s in ctx["subservice_reports_on_file"]}
     for org in sub.get("values", []):
         if not any(h in org.lower() for h in held):
-            add("CARVE_OUT_NO_ASSURANCE", f"{org} ({sub.get('method', 'UNKNOWN')})", sub.get("page"))
+            add("CARVE_OUT_NO_ASSURANCE", f"{org} ({sub.get('method', 'UNKNOWN')})", sub.get("page"), key=_slug(org))
 
     cu = ex.get("cuecs", {})
     if cu.get("count", 0) == 0:
@@ -126,6 +144,7 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
 def to_markdown(ex: dict, findings: list[Finding], ctx: dict) -> str:
     L = [f"# SOC 2 reliance review: {ex.get('source_file')} (as of {ctx['as_of']})", "",
          "**Nothing below is a finding until a reviewer approves it.** Status shows PROPOSED / APPROVED / REJECTED.", "",
+         f"Extraction hash: `{report_hash(ex)}` (decisions are bound to it)", "",
          "## What the extractor read", "", "| Field | Value | Page |", "|---|---|---|"]
     rt, p, op, c, s, cu, tr, au = (ex.get(k, {}) for k in ("report_type", "period", "opinion", "categories", "subservice_orgs", "cuecs", "test_results", "auditor"))
     L += [f"| Report type | {rt.get('value')} | {rt.get('page')} |",

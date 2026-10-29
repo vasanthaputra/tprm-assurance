@@ -10,7 +10,7 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 |---|---|---|
 | 1. Register check | Inventory completeness against accounts payable; reassessment by tier; DPA for personal data; report type, staleness, bridge letters | **Done**: 10 tests |
 | 2. Risk acceptance | Approver by delegated authority; owner; time-boxed expiry; max duration by rating; aging KRI | **Done**: 8 tests |
-| 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log) | **Done**: 6 tests, verified against a real public report |
+| 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log, each decision bound to a hash of the extraction so it can't leak onto another report) | **Done**: 6 tests, verified against a real public report |
 | 4. Evaluation | Extraction accuracy per field against hand-verified ground truth, published here | Partly: the rules extractor scores 100% of fields on the one public report (`data/fixtures/`); the AI path is not yet measured |
 
 ## Run it
@@ -21,7 +21,7 @@ python -m tprm_assurance.cli register data/sample/vendor_register.csv data/sampl
 python -m tprm_assurance.cli acceptances data/sample/risk_acceptances.csv
 python -m tprm_assurance.cli soc2 extract vendor_report.pdf --out extraction.json
 python -m tprm_assurance.cli soc2 review extraction.json --context data/sample/soc2_context.yaml --out review.md
-python -m tprm_assurance.cli soc2 decide "vendor_report:REPORT_STALE:1" approve --reviewer "your name" --note "confirmed on page 1"
+python -m tprm_assurance.cli soc2 decide extraction.json "vendor-report:REPORT_STALE:1" approve --reviewer "your name" --note "confirmed on page 1"
 python -m pytest
 ```
 
