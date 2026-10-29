@@ -1,4 +1,4 @@
-"""Command line: python -m vendor_rely.cli register <register.csv> <ap.csv> [--policy policy.yaml] [--out report.md]"""
+"""Command line: python -m tprm_assurance.cli register <register.csv> <ap.csv> [--policy policy.yaml] [--out report.md]"""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="vendor-rely")
+    p = argparse.ArgumentParser(prog="tprm-assurance")
     sub = p.add_subparsers(dest="command", required=True)
     reg = sub.add_parser("register", help="check a vendor register against policy")
     reg.add_argument("register_csv", type=Path)

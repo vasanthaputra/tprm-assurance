@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vendor_rely.register import check_vendor, load_policy, months_between, read_csv, run
+from tprm_assurance.register import check_vendor, load_policy, months_between, read_csv, run
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "data" / "sample"

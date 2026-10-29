@@ -1,4 +1,4 @@
-"""Vendor register check: module 1 of Vendor-Rely.
+"""Vendor register check: module 1 of tprm-assurance.
 
 Reads a vendor register and an accounts-payable vendor list, then applies the rules in
 policy.yaml. Each finding names the rule and the source it comes from (see SOURCES.md).
