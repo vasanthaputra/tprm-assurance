@@ -85,11 +85,18 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
     found: list[Finding] = []
     n = Counter()
 
+    used: set[str] = set()
+
     def add(rule: str, detail: str, page: int | None, key: str | None = None):
         # The id names what the finding is about (a stable key, not a position), and the
-        # hash ties it to this exact extraction.
+        # hash ties it to this exact extraction. Keys must be unique within the report: if
+        # two names reduce to the same slug, the second gets a numeric suffix.
         n[rule] += 1
-        found.append(Finding(f"{tag}:{rule}:{key or n[rule]}", rule, detail, page, h))
+        fid = f"{tag}:{rule}:{key or n[rule]}"
+        if fid in used:
+            fid = f"{fid}-{n[rule]}"
+        used.add(fid)
+        found.append(Finding(fid, rule, detail, page, h))
 
     rt = ex.get("report_type", {})
     if rt.get("value") == "SOC2_TYPE1" and ctx["expect_type2"]:
@@ -138,6 +145,7 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
     tr = ex.get("test_results", {})
     if tr.get("exceptions_noted", 0) > 0:
         add("EXCEPTIONS_PRESENT", f"{tr['exceptions_noted']} results say exceptions noted ({tr.get('no_exceptions_noted')} clean)", tr.get("from_page"))
+    assert len({f.id for f in found}) == len(found), "finding ids must be unique within a report"
     return found
 
 
