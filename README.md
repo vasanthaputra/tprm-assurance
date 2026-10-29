@@ -47,6 +47,10 @@ Every rule cites a source in [`SOURCES.md`](SOURCES.md): the 2023 Fed/FDIC/OCC i
 
 [`docs/soc2_report_anatomy.md`](docs/soc2_report_anatomy.md) walks through the structure of a real, vendor-published SOC 2 Type 2 report and what a reviewer checks in each section.
 
+## Related work
+
+Open-source GRC platforms such as [CISO Assistant](https://github.com/intuitem/ciso-assistant-community), [Probo](https://github.com/getprobo/probo) and [Openlane](https://github.com/theopenlane/core) store vendors, controls and evidence, and Probo exposes its data to AI agents through MCP. [HoundDog](https://github.com/hounddogai/hounddog) takes the same deterministic-first, AI-where-it-earns-it stance as this project. None of them, as far as their READMEs say, decide whether a SOC 2 report can be *relied on* (period and bridge letter, scope against the services used, carve-outs, CUEC ownership), publish how accurate their AI extraction is, or model the risk-acceptance lifecycle. That is the narrow slice this project covers.
+
 ## Data
 
 Sample data is **synthetic** and labelled as such. Real assessment results are confidential, and pinning invented findings on a real company would be false. The answer key (`data/sample/answer_key.csv`) lists every planted problem plus look-alike rows that must *not* be flagged. The tests require an exact match.
