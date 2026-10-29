@@ -1,0 +1,80 @@
+{
+  "source_file": "msg91_soc2.pdf",
+  "pages": 52,
+  "extractor": "rules",
+  "report_type": {
+    "value": "SOC2_TYPE2",
+    "page": 1
+  },
+  "period": {
+    "start": "2024-01-26",
+    "end": "2024-04-26",
+    "page": 1
+  },
+  "report_date": {
+    "value": "2024-05-15",
+    "page": 9
+  },
+  "next_report_due": {
+    "value": "2025-04-27",
+    "page": 1
+  },
+  "opinion": {
+    "value": "UNQUALIFIED",
+    "page": 8,
+    "basis": "no qualifying language in the opinion section"
+  },
+  "categories": {
+    "in_scope": [
+      "Security",
+      "Availability",
+      "Confidentiality"
+    ],
+    "also_mentioned": [
+      "Processing Integrity",
+      "Privacy"
+    ],
+    "page": 6
+  },
+  "subservice_orgs": {
+    "values": [
+      "Amazon Web services(AWS)",
+      "Github(Github Inc)",
+      "MongoDB",
+      "MySQL",
+      "Google LLC (Google Workspace)"
+    ],
+    "method": "carve-out",
+    "page": 6
+  },
+  "cuecs": {
+    "count": 12,
+    "page": 30
+  },
+  "csoc_criteria": {
+    "values": [
+      "A1.2",
+      "A1.3",
+      "C1.1",
+      "C1.2",
+      "CC6.1",
+      "CC6.2",
+      "CC6.3",
+      "CC6.4",
+      "CC6.5",
+      "CC7.2"
+    ],
+    "page": 31
+  },
+  "auditor": {
+    "signer": "Neha Mishra",
+    "firm": "Atom Assurances",
+    "page": 9,
+    "firm_page": 34
+  },
+  "test_results": {
+    "no_exceptions_noted": 144,
+    "exceptions_noted": 0,
+    "from_page": 34
+  }
+}

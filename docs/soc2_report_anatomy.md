@@ -20,7 +20,7 @@ These are **observations from reading the document, not conclusions about the ve
 1. **Observation period is 3 months** (26 Jan – 26 Apr 2024). S3 says Type 2 periods are "commonly 6 or 12 months". A short first-year period is common, but ask.
 2. **The next report is due 27 Apr 2025**, a year after a 3-month period. Most of that year has no coverage → **bridge letter** (S3: needed once the period ended more than ~3 months ago).
 3. **Scope wording is inconsistent.** It lists "Security, Confidentiality, Availability, Processing Integrity & Privacy" and then "Security, Confidentiality and Availability", and uses the pre-2017 term "Trust Services **Principles**". Confirm which categories were actually tested.
-4. **Signed by an individual** with a licence number, not a firm name. Verify the issuer's licence and standing with the issuing body.
+4. **The signature block names an individual CPA with a licence number**; the firm ("Atom Assurances") appears only later, in the sampling section. Verify the issuer's licence and standing with the issuing body.
 5. **Five subservice organisations are carved out**, including the whole hosting layer (AWS). S3 red flag: "carve-out of the entire hosting layer with no subservice assurance". Obtain AWS's own report.
 
 ## Second reference (S6, Netspective SOC 2 Type 1)

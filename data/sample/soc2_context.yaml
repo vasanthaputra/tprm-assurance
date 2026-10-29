@@ -1,0 +1,8 @@
+# EXAMPLE reviewer context. This is the REVIEWER'S input (what we use, what we hold), not a
+# fact about any vendor. Edit it for your own review.
+as_of: 2026-10-29
+expect_type2: true                 # Type 1 where Type 2 is expected is a red flag (S3)
+categories_needed: [Security, Availability]
+bridge_letter_on_file: false
+subservice_reports_on_file: []     # e.g. [AWS] once you hold the provider's own SOC report
+cuec_owners: {}                    # e.g. {1: it-access-team, 2: it-access-team} once assigned

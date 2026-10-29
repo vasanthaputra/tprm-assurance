@@ -1,0 +1,14 @@
+{
+  "_about": "Hand-verified facts read from S5 (MSG91 / Walkover Web Solutions SOC 2 Type 2, vendor-published at msg91.com/pdf/soc2.pdf, 52 PDF pages). Page numbers are PDF page indexes (1-based), not the printed labels. Used to score extractors (module 4). Facts only; no conclusions about the vendor.",
+  "report_type": {"value": "SOC2_TYPE2", "page": 1},
+  "period": {"start": "2024-01-26", "end": "2024-04-26", "page": 1},
+  "next_report_due": {"value": "2025-04-27", "page": 1},
+  "report_date": {"value": "2024-05-15", "page": 9},
+  "opinion": {"value": "UNQUALIFIED", "page": 8},
+  "categories": {"in_scope": ["Security", "Availability", "Confidentiality"], "also_mentioned": ["Processing Integrity", "Privacy"], "page": 6},
+  "subservice_orgs": {"values": ["Amazon Web services(AWS)", "Github(Github Inc)", "MongoDB", "MySQL", "Google LLC (Google Workspace)"], "method": "carve-out", "page": 6},
+  "cuecs": {"count": 12, "page": 30},
+  "csoc_criteria": {"values": ["A1.2", "A1.3", "C1.1", "C1.2", "CC6.1", "CC6.2", "CC6.3", "CC6.4", "CC6.5", "CC7.2"], "page": 31},
+  "auditor": {"signer": "Neha Mishra", "firm": "Atom Assurances", "page": 9},
+  "test_results": {"exceptions_noted": 0, "from_page": 34}
+}

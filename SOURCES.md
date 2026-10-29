@@ -16,3 +16,7 @@ Every rule in tprm-assurance comes from one of these. Nothing is invented. Where
 
 `data/sample/` is **synthetic** and says so in every file. Real vendors' assessment results are confidential, and attributing invented findings to a real company would be false. The vendor names come from S4 (fictional). The columns follow S1, S2 and S3.
 | S8 | NIST SP 800-53 Rev. 5 (OSCAL catalog, github.com/usnistgov/oscal-content): RA-7 Risk Response, CA-5 Plan of Action and Milestones, PM-28 Risk Framing | Respond to findings "in accordance with organizational risk tolerance" (RA-7); document planned remediation with scheduled dates and keep it updated (CA-5); identify and document organisational risk tolerance (PM-28). Basis for: acceptances need an owner, a dated end, and an approver with the authority the organisation has set | 2026-10-29 |
+
+## Verification on a real report
+
+`data/fixtures/s5_msg91_ground_truth.json` holds the facts read by hand from S5 (dates, opinion, categories, subservice organisations, CUEC count, CSOC criteria, auditor, test results, with PDF page numbers). `data/fixtures/s5_msg91_rules_extraction.json` is what the rules extractor produced; `tests/test_soc2.py` requires them to match field for field. The PDF itself is not redistributed: it is the vendor's restricted-use document, published on their own site.

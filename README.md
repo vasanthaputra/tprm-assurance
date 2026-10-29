@@ -10,8 +10,8 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 |---|---|---|
 | 1. Register check | Inventory completeness against accounts payable; reassessment by tier; DPA for personal data; report type, staleness, bridge letters | **Done**: 10 tests |
 | 2. Risk acceptance | Approver by delegated authority; owner; time-boxed expiry; max duration by rating; aging KRI | **Done**: 8 tests |
-| 3. SOC 2 reader | AI extracts period, opinion, scope, exceptions, CUECs, carve-outs, each with a page citation; rules decide; a human approves | Planned |
-| 4. Evaluation | Extraction accuracy per field, published here | Planned |
+| 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log) | **Done**: 6 tests, verified against a real public report |
+| 4. Evaluation | Extraction accuracy per field against hand-verified ground truth, published here | Partly: the rules extractor scores 100% of fields on the one public report (`data/fixtures/`); the AI path is not yet measured |
 
 ## Run it
 
@@ -19,8 +19,21 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 pip install pyyaml pytest
 python -m tprm_assurance.cli register data/sample/vendor_register.csv data/sample/ap_vendors.csv
 python -m tprm_assurance.cli acceptances data/sample/risk_acceptances.csv
+python -m tprm_assurance.cli soc2 extract vendor_report.pdf --out extraction.json
+python -m tprm_assurance.cli soc2 review extraction.json --context data/sample/soc2_context.yaml --out review.md
+python -m tprm_assurance.cli soc2 decide "vendor_report:REPORT_STALE:1" approve --reviewer "your name" --note "confirmed on page 1"
 python -m pytest
 ```
+
+### Three ways to extract facts from a SOC 2 report
+
+| Path | Needs | How |
+|---|---|---|
+| `--extractor rules` (default) | `pypdf` | Pattern matching on the page text. Deterministic, traceable, no AI. |
+| **Copy-paste** | a Claude (or other assistant) chat window | `soc2 prompt report.pdf --out prompt.txt`, paste the file into the chat, save the JSON reply, run `soc2 review` on it. No API key. |
+| `--extractor anthropic` | `pip install anthropic` + credentials | Sends the PDF to the API with a strict JSON schema. **Written but not yet run.** |
+
+Whatever produced the extraction, the reliance rules and the human gate are the same. The reviewer's context file (what services you use, which categories you need, which subservice reports and CUEC owners you already have) changes the outcome, and it is your input, not a fact about the vendor.
 
 Output: [`data/sample/sample_report.md`](data/sample/sample_report.md), an exposure-by-tier summary, findings by rule with their source, then every finding.
 
