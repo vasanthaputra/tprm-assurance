@@ -1,0 +1,11 @@
+# Planted problems in the synthetic acceptances, reviewed as of 2026-10-29. Every row must be found, nothing else.
+# Look-alikes that must NOT be flagged: A1 (3-month CRITICAL, in date), A5 (5 months HIGH), A7 (BOARD is above the
+# required CISO, which is fine), A8 (CLOSED, ignored), A9 (expires today, 6 months HIGH = exactly the max).
+id,rule
+A2,APPROVER_BELOW_AUTHORITY
+A3,EXPIRED
+A3,DURATION_OVER_MAX
+A4,NO_EXPIRY
+A6,NO_OWNER
+A10,EXPIRED
+A11,NOT_APPROVED

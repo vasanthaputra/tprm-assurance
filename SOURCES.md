@@ -15,3 +15,4 @@ Every rule in tprm-assurance comes from one of these. Nothing is invented. Where
 ## Sample data
 
 `data/sample/` is **synthetic** and says so in every file. Real vendors' assessment results are confidential, and attributing invented findings to a real company would be false. The vendor names come from S4 (fictional). The columns follow S1, S2 and S3.
+| S8 | NIST SP 800-53 Rev. 5 (OSCAL catalog, github.com/usnistgov/oscal-content): RA-7 Risk Response, CA-5 Plan of Action and Milestones, PM-28 Risk Framing | Respond to findings "in accordance with organizational risk tolerance" (RA-7); document planned remediation with scheduled dates and keep it updated (CA-5); identify and document organisational risk tolerance (PM-28). Basis for: acceptances need an owner, a dated end, and an approver with the authority the organisation has set | 2026-10-29 |

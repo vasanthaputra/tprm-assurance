@@ -9,7 +9,7 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 | Module | What it does | Status |
 |---|---|---|
 | 1. Register check | Inventory completeness against accounts payable; reassessment by tier; DPA for personal data; report type, staleness, bridge letters | **Done**: 10 tests |
-| 2. Risk acceptance | Approver by delegated authority, conditions, expiry, aging | Planned |
+| 2. Risk acceptance | Approver by delegated authority; owner; time-boxed expiry; max duration by rating; aging KRI | **Done**: 8 tests |
 | 3. SOC 2 reader | AI extracts period, opinion, scope, exceptions, CUECs, carve-outs, each with a page citation; rules decide; a human approves | Planned |
 | 4. Evaluation | Extraction accuracy per field, published here | Planned |
 
@@ -18,6 +18,7 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 ```bash
 pip install pyyaml pytest
 python -m tprm_assurance.cli register data/sample/vendor_register.csv data/sample/ap_vendors.csv
+python -m tprm_assurance.cli acceptances data/sample/risk_acceptances.csv
 python -m pytest
 ```
 
