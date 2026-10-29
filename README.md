@@ -1,8 +1,8 @@
-# Vendor-Rely
+# tprm-assurance
 
 **Decide whether you can rely on a vendor's assurance evidence, and show why.**
 
-Third-party risk teams spend their time on two questions: *is our vendor inventory complete and current?* and *can we rely on this vendor's SOC 2 report?* Most open-source TPRM tools either run the whole GRC programme or summarise SOC 2 reports with AI and assert time savings. Vendor-Rely does the reviewer's actual checks, ties every rule to a published source, and (in later modules) measures how often its AI extraction is right.
+Third-party risk teams spend their time on two questions: *is our vendor inventory complete and current?* and *can we rely on this vendor's SOC 2 report?* Most open-source TPRM tools either run the whole GRC programme or summarise SOC 2 reports with AI and assert time savings. tprm-assurance does the reviewer's actual checks, ties every rule to a published source, and (in later modules) measures how often its AI extraction is right.
 
 ## Status
 
@@ -17,7 +17,7 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 
 ```bash
 pip install pyyaml pytest
-python -m vendor_rely.cli register data/sample/vendor_register.csv data/sample/ap_vendors.csv
+python -m tprm_assurance.cli register data/sample/vendor_register.csv data/sample/ap_vendors.csv
 python -m pytest
 ```
 
