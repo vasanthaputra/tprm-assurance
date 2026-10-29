@@ -20,3 +20,23 @@ assurance:
   type2_required_for: [CRITICAL, HIGH]   # same source, red-flag list: "Type I offered where
                                          # Type II expected". Which tiers "expect" Type II is
                                          # ORG POLICY.
+
+acceptance:               # Module 2: risk acceptance lifecycle
+  # Who may accept a risk at each rating. ORG POLICY — the interagency guidance (S1) says the
+  # board "may approve or delegate approval" for higher-risk third parties; NIST SP 800-53 PM-28
+  # (S8) requires the organisation to document its risk tolerance. The ladder below is one
+  # reasonable delegation; change it to match yours.
+  role_ladder: [RISK_ANALYST, SECURITY_MANAGER, SECURITY_DIRECTOR, CISO, BOARD]   # lowest -> highest
+  approver_by_rating:
+    CRITICAL: CISO
+    HIGH: SECURITY_DIRECTOR
+    MEDIUM: SECURITY_MANAGER
+    LOW: RISK_ANALYST
+  # Longest an acceptance may run before it must be re-decided. ORG POLICY. Exceptions are
+  # "time-boxed, approved" (S4); plans of action carry scheduled dates and are updated (S8, CA-5).
+  max_duration_months:
+    CRITICAL: 3
+    HIGH: 6
+    MEDIUM: 12
+    LOW: 12
+  aging_buckets_days: [90, 180, 365]   # KRI buckets for how long open acceptances have run
