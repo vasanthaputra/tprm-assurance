@@ -99,9 +99,12 @@ def test_decision_does_not_leak_to_a_different_report(fixture, tmp_path):
 def test_colliding_provider_names_get_distinct_ids(fixture):
     ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
     ex = json.loads(json.dumps(fixture))
-    ex["subservice_orgs"]["values"] = ["AWS (EU)", "AWS/EU", "AWS - EU"]   # all slug to "aws-eu"
+    # three names slug to "aws-eu"; the fourth slugs to "aws-eu-2", which must not be
+    # mistaken for a suffixed duplicate of the first
+    ex["subservice_orgs"]["values"] = ["AWS (EU)", "AWS/EU", "AWS - EU", "AWS EU 2"]
     ids = [f.id for f in propose(ex, ctx) if f.rule == "CARVE_OUT_NO_ASSURANCE"]
-    assert len(ids) == 3 and len(set(ids)) == 3
+    assert len(ids) == 4 and len(set(ids)) == 4
+    assert ids[1].endswith("aws-eu~2") and ids[2].endswith("aws-eu~3") and ids[3].endswith("aws-eu-2")
 
 
 def test_carve_out_ids_name_the_provider(fixture):

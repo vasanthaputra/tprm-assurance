@@ -92,9 +92,11 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
         # hash ties it to this exact extraction. Keys must be unique within the report: if
         # two names reduce to the same slug, the second gets a numeric suffix.
         n[rule] += 1
-        fid = f"{tag}:{rule}:{key or n[rule]}"
-        if fid in used:
-            fid = f"{fid}-{n[rule]}"
+        base = fid = f"{tag}:{rule}:{key or n[rule]}"
+        i = 2
+        while fid in used:                 # "~" can never come out of _slug, so suffixed
+            fid = f"{base}~{i}"            # ids cannot clash with a natural key
+            i += 1
         used.add(fid)
         found.append(Finding(fid, rule, detail, page, h))
 
@@ -145,7 +147,8 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
     tr = ex.get("test_results", {})
     if tr.get("exceptions_noted", 0) > 0:
         add("EXCEPTIONS_PRESENT", f"{tr['exceptions_noted']} results say exceptions noted ({tr.get('no_exceptions_noted')} clean)", tr.get("from_page"))
-    assert len({f.id for f in found}) == len(found), "finding ids must be unique within a report"
+    if len({f.id for f in found}) != len(found):
+        raise ValueError("finding ids must be unique within a report")
     return found
 
 
