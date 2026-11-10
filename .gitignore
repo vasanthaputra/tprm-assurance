@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 out/
+.venv/
+.env
+# Jev request logs that quote report pages (restricted-use documents); commit the .redacted.json copy instead
+data/runs/**/jev_report_b.json

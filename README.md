@@ -11,7 +11,7 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 | 1. Register check | Inventory completeness against accounts payable; reassessment by tier; DPA for personal data; report type, staleness, bridge letters | **Done**: 10 tests |
 | 2. Risk acceptance | Approver by delegated authority; owner; time-boxed expiry; max duration by rating; aging KRI | **Done**: 8 tests |
 | 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log, each decision bound to a hash of the extraction so it can't leak onto another report) | **Done**: 6 tests, verified against a real public report |
-| 4. Evaluation | `soc2 score` compares any extraction to hand-verified ground truth, field by field | **Done**: rules extractor = [26/26 fields](data/fixtures/s5_report_a_rules_accuracy.md) on the one public report; the AI paths are not yet measured |
+| 4. Evaluation | `soc2 score` compares any extraction to hand-read ground truth, field by field | **Measured on 2 public reports** ([results](data/runs/2026-11-10/RESULTS.md)): on the report it was not built from, the rules extractor scored 10/27 and missed every real reliance finding; Claude scored 25-26/27 with **0 factual errors** on both reports and produced the same 13 findings as the answer key, at $0.18-0.36 per report (page-text route) |
 | 5. Conflict queue | When two extractions of one report disagree (rules vs AI), each disagreement is listed for a person to resolve: take A, take B, or type the value from the report. Append-only log bound to a hash of the pair. `soc2 merge` is refused while a disagreement that decides a reliance rule is open; the gate in `policy.yaml` has no "off" setting | **Done**: 14 tests on synthetic disagreements; not yet run on a real AI reply |
 
 ## Run it
@@ -36,7 +36,7 @@ Two-minute version for a demo or interview: [`docs/WALKTHROUGH.md`](docs/WALKTHR
 |---|---|---|
 | `--extractor rules` (default) | `pypdf` | Pattern matching on the page text. Deterministic, traceable, no AI. |
 | **Copy-paste** | a Claude (or other assistant) chat window | `soc2 prompt report.pdf --out prompt.txt`, paste the file into the chat, save the JSON reply, run `soc2 review` on it. No API key. |
-| `--extractor anthropic` | `pip install anthropic` + credentials | Sends the PDF to the API with a strict JSON schema. **Written but not yet run.** |
+| `--extractor anthropic` or `anthropic-text` | `pip install anthropic` + `ANTHROPIC_API_KEY` | Sends the PDF (or its page text) to Claude with a strict JSON schema. Token use and cost are written next to the output as `.meta.json`. Measured 2026-11-10, see the run results. |
 
 Whatever produced the extraction, the reliance rules and the human gate are the same.
 
@@ -50,6 +50,15 @@ python -m tprm_assurance.cli soc2 resolve rules.json ai.json cuecs.count manual 
 python -m tprm_assurance.cli soc2 merge rules.json ai.json --out merged.json   # exit 2 while blocked
 python -m tprm_assurance.cli soc2 review merged.json --context data/sample/soc2_context.yaml
 ```
+
+Optional: ask TypeSafe's Jev decision model which reading the cited page supports (needs `pip install typesafe-sdk` and `TYPESAFE_API_KEY`). One yes/no question per disputed value; at or above `jev_yes` (0.8) it is supported, at or below `jev_no` (0.2) it is not, in between the person decides. Counts and dates are never sent to Jev (its own docs say it does not count reliably and reads dates as text). The suggestion is a column in the queue; it never resolves anything.
+
+```bash
+python -m tprm_assurance.cli soc2 jev-check rules.json ai.json --pdf vendor_report.pdf --out suggestions.json
+python -m tprm_assurance.cli soc2 conflicts rules.json ai.json --suggestions suggestions.json
+```
+
+Status: measured 2026-11-10 ([results](data/runs/2026-11-10/RESULTS.md)). Planted-error test, 46 questions on 2 real reports: **0 planted wrong values accepted, 0 true values rejected**; 43 settled, 3 sent to a person (two of them the self-contradicting scope page marked hard before the run). On real rules-vs-Claude disagreements: 11 of 12 settled correctly, 1 to a person, 0 wrong.
 
 **HIGH** = the field decides whether a reliance rule fires (report type, period, opinion, categories, subservice organisations, CUEC count, exceptions). **LOW** = a page citation or detail text; a test checks that changing any LOW field changes no rule outcome. Differences in capitalisation, spacing or list order are not conflicts; one extractor saying "not found" while the other found a value is. Resolve every conflict before approving findings: the merged file is a new extraction with its own hash, so findings decided on it do not carry over if it is merged again. The reviewer's context file (what services you use, which categories you need, which subservice reports and CUEC owners you already have) changes the outcome, and it is your input, not a fact about the vendor.
 

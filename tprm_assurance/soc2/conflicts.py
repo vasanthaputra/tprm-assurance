@@ -180,7 +180,8 @@ def merge(a: dict, b: dict, log_path: Path, policy: dict | None) -> dict:
     return out
 
 
-def to_markdown(a: dict, b: dict, conflicts: list[Conflict], gate: str) -> str:
+def to_markdown(a: dict, b: dict, conflicts: list[Conflict], gate: str, suggestions: dict | None = None) -> str:
+    """`suggestions` (from jev_check.load_suggestions) adds a column; it never resolves anything."""
     blocked = blocking(conflicts, gate)
     state = (f"**BLOCKED**: {len(blocked)} open conflict(s) at or above {gate} must be resolved before merge."
              if blocked else f"Merge allowed at gate {gate}.")
@@ -189,12 +190,18 @@ def to_markdown(a: dict, b: dict, conflicts: list[Conflict], gate: str) -> str:
          f"pair `{pair_hash(a, b)}`", "",
          "**Neither extractor is the record; the report is.** Check the page and resolve each row "
          "(`soc2 resolve ... a|b|manual`).", "", state, "",
-         "| Conflict | Severity | A | B | Status | Resolution |", "|---|---|---|---|---|---|"]
+         "| Conflict | Severity | A | B | Status | Resolution |" + (" Jev suggests |" if suggestions is not None else ""),
+         "|---|---|---|---|---|---|" + ("---|" if suggestions is not None else "")]
+    if suggestions is not None:
+        from .jev_check import describe
     for c in conflicts:
         r = c.resolution
         res = f"{r['choice']} = {r['value']!r} by {r['reviewer']}" if r else "-"
-        L.append(f"| {c.id} | {c.severity} | {c.a!r} | {c.b!r} | {c.status} | {res} |")
+        extra = f" {describe(suggestions.get(c.id))} |" if suggestions is not None else ""
+        L.append(f"| {c.id} | {c.severity} | {c.a!r} | {c.b!r} | {c.status} | {res} |{extra}")
     if not conflicts:
         L.append("| - | - | - | - | - | the two extractions agree on every key both report |")
+    if suggestions is not None:
+        L += ["", "Jev suggestions are advice from a decision model reading the cited page; a person still resolves each row."]
     L += ["", "HIGH = the field decides whether a reliance rule fires. LOW = page citation or detail text only."]
     return "\n".join(L) + "\n"

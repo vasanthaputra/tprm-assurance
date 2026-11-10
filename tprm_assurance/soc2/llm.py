@@ -17,26 +17,29 @@ MODEL = "claude-opus-5-5"
 SCHEMA = {
     "type": "object",
     "properties": {
-        "report_type": {"type": "object", "properties": {"value": {"type": "string", "enum": ["SOC2_TYPE1", "SOC2_TYPE2", "UNKNOWN"]}, "page": {"type": ["integer", "null"]}}, "required": ["value", "page"], "additionalProperties": False},
-        "period": {"type": "object", "properties": {"start": {"type": ["string", "null"]}, "end": {"type": ["string", "null"]}, "page": {"type": ["integer", "null"]}}, "required": ["start", "end", "page"], "additionalProperties": False},
-        "report_date": {"type": "object", "properties": {"value": {"type": ["string", "null"]}, "page": {"type": ["integer", "null"]}}, "required": ["value", "page"], "additionalProperties": False},
-        "opinion": {"type": "object", "properties": {"value": {"type": "string", "enum": ["UNQUALIFIED", "QUALIFIED", "ADVERSE_OR_DISCLAIMER", "UNKNOWN"]}, "page": {"type": ["integer", "null"]}, "basis": {"type": "string"}}, "required": ["value", "page", "basis"], "additionalProperties": False},
-        "categories": {"type": "object", "properties": {"in_scope": {"type": "array", "items": {"type": "string"}}, "also_mentioned": {"type": "array", "items": {"type": "string"}}, "page": {"type": ["integer", "null"]}}, "required": ["in_scope", "also_mentioned", "page"], "additionalProperties": False},
-        "subservice_orgs": {"type": "object", "properties": {"values": {"type": "array", "items": {"type": "string"}}, "method": {"type": "string", "enum": ["carve-out", "inclusive", "UNKNOWN"]}, "page": {"type": ["integer", "null"]}}, "required": ["values", "method", "page"], "additionalProperties": False},
-        "cuecs": {"type": "object", "properties": {"count": {"type": "integer"}, "page": {"type": ["integer", "null"]}}, "required": ["count", "page"], "additionalProperties": False},
-        "csoc_criteria": {"type": "object", "properties": {"values": {"type": "array", "items": {"type": "string"}}, "page": {"type": ["integer", "null"]}}, "required": ["values", "page"], "additionalProperties": False},
-        "auditor": {"type": "object", "properties": {"signer": {"type": ["string", "null"]}, "firm": {"type": ["string", "null"]}, "page": {"type": ["integer", "null"]}}, "required": ["signer", "firm", "page"], "additionalProperties": False},
-        "test_results": {"type": "object", "properties": {"no_exceptions_noted": {"type": "integer"}, "exceptions_noted": {"type": "integer"}, "from_page": {"type": ["integer", "null"]}}, "required": ["no_exceptions_noted", "exceptions_noted", "from_page"], "additionalProperties": False},
+        "report_type": {"type": "object", "properties": {"value": {"type": "string", "enum": ["SOC2_TYPE1", "SOC2_TYPE2", "UNKNOWN"]}, "page": {"type": "integer"}}, "required": ["value", "page"], "additionalProperties": False},
+        "period": {"type": "object", "properties": {"start": {"type": ["string", "null"]}, "end": {"type": ["string", "null"]}, "page": {"type": "integer"}}, "required": ["start", "end", "page"], "additionalProperties": False},
+        "report_date": {"type": "object", "properties": {"value": {"type": ["string", "null"]}, "page": {"type": "integer"}}, "required": ["value", "page"], "additionalProperties": False},
+        "next_report_due": {"type": "object", "properties": {"value": {"type": ["string", "null"]}, "page": {"type": "integer"}}, "required": ["value", "page"], "additionalProperties": False},
+        "opinion": {"type": "object", "properties": {"value": {"type": "string", "enum": ["UNQUALIFIED", "QUALIFIED", "ADVERSE_OR_DISCLAIMER", "UNKNOWN"]}, "page": {"type": "integer"}, "basis": {"type": "string"}}, "required": ["value", "page", "basis"], "additionalProperties": False},
+        "categories": {"type": "object", "properties": {"in_scope": {"type": "array", "items": {"type": "string"}}, "also_mentioned": {"type": "array", "items": {"type": "string"}}, "page": {"type": "integer"}}, "required": ["in_scope", "also_mentioned", "page"], "additionalProperties": False},
+        "subservice_orgs": {"type": "object", "properties": {"values": {"type": "array", "items": {"type": "string"}}, "method": {"type": "string", "enum": ["carve-out", "inclusive", "UNKNOWN"]}, "page": {"type": "integer"}}, "required": ["values", "method", "page"], "additionalProperties": False},
+        "cuecs": {"type": "object", "properties": {"count": {"type": "integer"}, "page": {"type": "integer"}}, "required": ["count", "page"], "additionalProperties": False},
+        "csoc_criteria": {"type": "object", "properties": {"values": {"type": "array", "items": {"type": "string"}}, "page": {"type": "integer"}}, "required": ["values", "page"], "additionalProperties": False},
+        "auditor": {"type": "object", "properties": {"signer": {"type": ["string", "null"]}, "firm": {"type": ["string", "null"]}, "page": {"type": "integer"}}, "required": ["signer", "firm", "page"], "additionalProperties": False},
+        "test_results": {"type": "object", "properties": {"no_exceptions_noted": {"type": "integer"}, "exceptions_noted": {"type": "integer"}, "from_page": {"type": "integer"}}, "required": ["no_exceptions_noted", "exceptions_noted", "from_page"], "additionalProperties": False},
     },
-    "required": ["report_type", "period", "report_date", "opinion", "categories", "subservice_orgs", "cuecs", "csoc_criteria", "auditor", "test_results"],
+    "required": ["report_type", "period", "report_date", "next_report_due", "opinion", "categories", "subservice_orgs", "cuecs", "csoc_criteria", "auditor", "test_results"],
     "additionalProperties": False,
 }
 
 PROMPT = (
     "You are extracting facts from a SOC 2 report for a third-party risk reviewer. "
     "Report only what the document says; use null or UNKNOWN when a field is not present. "
-    "Every page number must be the 1-based page where you read the value. "
-    "Dates are ISO (YYYY-MM-DD). Categories are from: Security, Availability, Processing Integrity, "
+    "Every page number must be the 1-based page where you read the value; use 0 when the value is not in the document. "
+    "Dates are ISO (YYYY-MM-DD). 'report_date' is the date the auditor signed the report; "
+    "'next_report_due' is the date the report says the next report will be issued, if it says so. "
+    "Categories are from: Security, Availability, Processing Integrity, "
     "Confidentiality, Privacy. 'in_scope' are the categories the auditor's scope names as the applicable "
     "trust services criteria; 'also_mentioned' are other categories named on the same scope page. "
     "'cuecs.count' is the number of complementary user entity controls listed. 'test_results' counts the "
@@ -44,28 +47,67 @@ PROMPT = (
 )
 
 
-def extract_with_anthropic(pdf_path: Path) -> dict:
+PRICE_PER_MTOK = {"input": 4.00, "output": 20.00}   # claude-opus-5-5 list price (claude-api skill, cached 2026-11-03)
+
+
+def run_anthropic(pdf_path: Path, route: str = "pdf") -> tuple[dict, dict]:
+    """Extract with the Claude API. route="pdf" sends the PDF itself (Claude sees the pages);
+    route="text" sends the same pypdf page text the rules extractor reads, with page markers.
+    Returns (extraction, meta). Meta (tokens, cost, request id) is kept out of the extraction
+    so it never changes the extraction hash or shows up as a field to compare."""
     import anthropic  # optional dependency
 
+    if route == "pdf":
+        data = base64.standard_b64encode(pdf_path.read_bytes()).decode("utf-8")
+        content = [{"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": data}},
+                   {"type": "text", "text": PROMPT}]
+    elif route == "text":
+        from .extract import read_pages
+        pages = read_pages(pdf_path)
+        body = "\n".join(f"=== PAGE {i} ===\n{t}" for i, t in enumerate(pages, start=1))
+        content = [{"type": "text", "text": f"DOCUMENT: {pdf_path.name} ({len(pages)} pages)\n{body}"},
+                   {"type": "text", "text": PROMPT}]
+    else:
+        raise ValueError("route must be 'pdf' or 'text'")
+
     client = anthropic.Anthropic()
-    data = base64.standard_b64encode(pdf_path.read_bytes()).decode("utf-8")
     response = client.beta.messages.create(
         model=MODEL,
         max_tokens=16000,
         betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
+        fallbacks="default",          # on a policy decline the API re-runs on a fallback model
         output_config={"effort": "high", "format": {"type": "json_schema", "schema": SCHEMA}},
-        messages=[{"role": "user", "content": [
-            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": data}},
-            {"type": "text", "text": PROMPT},
-        ]}],
+        messages=[{"role": "user", "content": content}],
     )
+    u = response.usage
+    cost = (u.input_tokens * PRICE_PER_MTOK["input"] + u.output_tokens * PRICE_PER_MTOK["output"]) / 1e6
+    meta = {"route": route, "requested_model": MODEL, "served_model": response.model,
+            "request_id": getattr(response, "_request_id", None), "stop_reason": response.stop_reason,
+            "input_tokens": u.input_tokens, "output_tokens": u.output_tokens,
+            "estimated_cost_usd": round(cost, 4), "price_basis": f"{MODEL} list price per MTok {PRICE_PER_MTOK}"}
     if response.stop_reason == "refusal":
-        raise RuntimeError(f"model declined: {getattr(response.stop_details, 'explanation', '')}")
+        raise RuntimeError(f"model declined: {getattr(response.stop_details, 'explanation', '')} | {meta}")
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError(f"hit max_tokens before finishing the JSON | {meta}")
     text = next(b.text for b in response.content if b.type == "text")
-    out = json.loads(text)
-    out.update({"source_file": pdf_path.name, "extractor": f"anthropic:{MODEL}"})
-    return out
+    out = normalize_pages(json.loads(text))
+    out.update({"source_file": pdf_path.name, "extractor": f"anthropic-{route}"})
+    return out, meta
+
+
+def normalize_pages(ex: dict) -> dict:
+    """The schema uses page 0 for 'not found' (the API allows at most 16 nullable fields);
+    the rest of the code uses None, as the rules extractor does."""
+    for v in ex.values():
+        if isinstance(v, dict):
+            for k in ("page", "from_page"):
+                if v.get(k) == 0:
+                    v[k] = None
+    return ex
+
+
+def extract_with_anthropic(pdf_path: Path, route: str = "pdf") -> dict:
+    return run_anthropic(pdf_path, route)[0]
 
 
 def manual_prompt(pages: list[str], source_name: str) -> str:

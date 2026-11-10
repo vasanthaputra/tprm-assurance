@@ -11,6 +11,7 @@ Every rule in tprm-assurance comes from one of these. Nothing is invented. Where
 | S5 | Report A / Vendor A, *SOC 2 Type 2 Report*, observation period [period removed], published at report_a.com/pdf/soc2.pdf | **Real** report structure: opinion, restricted use, management assertion (DC 200), system description, CUECs, CSOCs with criteria mapping (e.g. AWS → CC6.1, CC6.2…), testing matrix, "No exceptions noted" convention. Used as a structural reference only, not redistributed | 2026-10-29 |
 | S6 | Netspective, public SOC 2 Type 1 report (github.com/netspective/www.netspective.com, GPL-3.0) | Second real structure reference (executive summary, auditor firm, categories in scope) | 2026-10-29 |
 | S7 | AICPA & CIMA, *Illustrative SOC 2® Report with Illustrative System Description* (Sept 30, 2023) | Official template. **Member-access only, not read.** Listed so the gap is visible | not accessed |
+| S9 | Vendor B, *SOC 2 Type 2 Report*, period 1 Aug 2023 – 31 Jul 2024, auditor [audit firm B], published at report_b.com/uploads/images/Report B-SOC-2-Type-2-FINAL-Report-073124.pdf (129 pages) | Second real report, a different auditor's layout; held out from the rules extractor; answer key `data/fixtures/s9_report_b_ground_truth.json`. Not redistributed | 2026-11-10 |
 
 ## Sample data
 

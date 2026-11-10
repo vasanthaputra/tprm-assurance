@@ -25,6 +25,11 @@ conflicts:                # When two extractions of one SOC 2 report disagree (s
   gate_severity: HIGH     # ORG POLICY. HIGH = merge is refused while a field that decides a reliance
                           # rule is unresolved; LOW = refused while ANY disagreement is unresolved.
                           # There is no setting that turns the gate off.
+  jev_yes: 0.8            # ORG POLICY. soc2 jev-check: Jev's P(page supports the value) at or above
+  jev_no: 0.2             # jev_yes = supported, at or below jev_no = not supported, between = the
+                          # person decides. 0.8 is the acceptance threshold Proceda used with Jev
+                          # (github.com/vivekhaldar/proceda); TypeSafe suggests 0.7/0.3 to start.
+                          # Suggestions are advice only; nothing is resolved without a person.
 
 acceptance:               # Module 2: risk acceptance lifecycle
   # Who may accept a risk at each rating. ORG POLICY — the interagency guidance (S1) says the

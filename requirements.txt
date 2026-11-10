@@ -3,3 +3,5 @@ pypdf>=4.0
 pytest>=8.0
 # optional, only for `soc2 extract --extractor anthropic`:
 # anthropic>=1.0
+# optional, only for `soc2 jev-check` (TypeSafe Jev; needs TYPESAFE_API_KEY):
+# typesafe-sdk>=0.7.5

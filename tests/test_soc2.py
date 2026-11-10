@@ -127,6 +127,17 @@ def test_extract_type1_as_of_and_qualified_opinion():
     assert ex["cuecs"]["count"] == 0
 
 
+def test_quoted_legend_phrase_is_not_counted_as_a_result():
+    """Found 2026-11-10 by the rules-vs-Claude conflict queue on S5: page 34 explains that clean
+    results are 'noted by the phrase “No exceptions noted”'. That sentence is not a result."""
+    pages = ["Test Results In this matrix, a clean result is marked with the phrase "
+             "“No exceptions noted” in the last column. Any phrase other than the above, "
+             "\"exceptions noted\", indicates a deviation.",
+             "CC1.1 ... No exceptions noted. CC1.2 ... No exceptions noted. CC1.3 ... Exceptions noted: 1 of 25."]
+    tr = extract(pages)["test_results"]
+    assert tr["no_exceptions_noted"] == 2 and tr["exceptions_noted"] == 1
+
+
 def test_qualified_outside_opinion_section_is_ignored():
     pages = ["Opinion In our opinion the description fairly presents. Restricted Use", "uses a qualified third-party service"]
     assert extract(pages)["opinion"]["value"] == "UNQUALIFIED"

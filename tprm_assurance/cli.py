@@ -11,6 +11,7 @@
   python -m tprm_assurance.cli soc2 conflicts <a.json> <b.json> [--resolutions log.jsonl] [--out F]   (two extractions of one report)
   python -m tprm_assurance.cli soc2 resolve   <a.json> <b.json> <conflict_id> a|b|manual --reviewer NAME [--value JSON] [--note ...]
   python -m tprm_assurance.cli soc2 merge     <a.json> <b.json> --out merged.json   (refused while the gate is blocked)
+  python -m tprm_assurance.cli soc2 jev-check <a.json> <b.json> --pdf report.pdf [--out suggestions.json]   (needs TYPESAFE_API_KEY)
 """
 from __future__ import annotations
 
@@ -59,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
     ex = soc.add_parser("extract")
     ex.add_argument("pdf", type=Path)
     ex.add_argument("--out", type=Path, required=True)
-    ex.add_argument("--extractor", choices=["rules", "anthropic"], default="rules")
+    ex.add_argument("--extractor", choices=["rules", "anthropic", "anthropic-text"], default="rules",
+                    help="anthropic = send the PDF to Claude; anthropic-text = send the extracted page text")
     pr = soc.add_parser("prompt", help="write a prompt to paste into the Claude app by hand (no API key)")
     pr.add_argument("pdf", type=Path)
     pr.add_argument("--out", type=Path, required=True)
@@ -79,7 +81,12 @@ def main(argv: list[str] | None = None) -> int:
     cf = soc.add_parser("conflicts", help="list where two extractions of the same report disagree")
     rs = soc.add_parser("resolve", help="resolve one conflict: take A, take B, or type the value from the report")
     mg = soc.add_parser("merge", help="build one extraction from the pair; refused while the gate is blocked")
-    for s in (cf, rs, mg):
+    jc = soc.add_parser("jev-check", help="ask Jev which reading the cited page supports (advice only)")
+    jc.add_argument("--pdf", type=Path, required=True, help="the report both extractions were read from")
+    jc.add_argument("--out", type=Path, default=Path("suggestions.json"))
+    jc.add_argument("--policy", type=Path, default=ROOT / "policy.yaml")
+    cf.add_argument("--suggestions", type=Path, help="suggestions.json from soc2 jev-check, shown as a column")
+    for s in (cf, rs, mg, jc):
         s.add_argument("a_json", type=Path, help="extraction A (usually the rules extractor)")
         s.add_argument("b_json", type=Path, help="extraction B (e.g. the copy-paste AI reply)")
         s.add_argument("--resolutions", type=Path, default=Path("conflicts.jsonl"))
@@ -126,9 +133,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(md)
     elif args.soc2_cmd == "extract":
-        if args.extractor == "anthropic":
-            from .soc2.llm import extract_with_anthropic
-            data = extract_with_anthropic(args.pdf)
+        if args.extractor.startswith("anthropic"):
+            from .soc2.llm import run_anthropic
+            data, meta = run_anthropic(args.pdf, "text" if args.extractor == "anthropic-text" else "pdf")
+            meta_path = args.out.with_suffix(".meta.json")
+            meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+            print(f"{meta['input_tokens']} in / {meta['output_tokens']} out tokens, ~${meta['estimated_cost_usd']} -> {meta_path}")
         else:
             from .soc2.extract import extract_pdf
             data = extract_pdf(args.pdf)
@@ -153,14 +163,27 @@ def main(argv: list[str] | None = None) -> int:
         h = report_hash(json.loads(args.extraction_json.read_text(encoding="utf-8")))
         entry = decide(args.decisions, args.finding_id, args.decision, args.reviewer, h, args.note)
         print(json.dumps(entry))
-    elif args.soc2_cmd in ("conflicts", "resolve", "merge"):
+    elif args.soc2_cmd in ("conflicts", "resolve", "merge", "jev-check"):
         from .soc2 import conflicts as cq
         a = json.loads(args.a_json.read_text(encoding="utf-8"))
         b = json.loads(args.b_json.read_text(encoding="utf-8"))
         if args.soc2_cmd == "conflicts":
             gate = cq.gate_severity(load_policy(args.policy))
             found = cq.apply_resolutions(cq.find_conflicts(a, b), args.resolutions)
-            _emit(cq.to_markdown(a, b, found, gate), args.out, len(found))
+            sug = None
+            if args.suggestions:
+                from .soc2.jev_check import load_suggestions
+                sug = load_suggestions(args.suggestions, cq.pair_hash(a, b))
+            _emit(cq.to_markdown(a, b, found, gate, sug), args.out, len(found))
+        elif args.soc2_cmd == "jev-check":
+            from .soc2.extract import read_pages
+            from .soc2.jev_check import check, describe, make_client
+            found = [c for c in cq.apply_resolutions(cq.find_conflicts(a, b), args.resolutions) if c.status == "OPEN"]
+            sug = check(found, a, b, read_pages(args.pdf), make_client(), load_policy(args.policy))
+            args.out.write_text(json.dumps([s.to_record() for s in sug], indent=2), encoding="utf-8")
+            for s in sug:
+                print(f"{s.conflict_id}: {describe(s.to_record())}")
+            print(f"{len(sug)} open conflicts checked -> {args.out}  (show them: soc2 conflicts ... --suggestions {args.out})")
         elif args.soc2_cmd == "resolve":
             value = json.loads(args.value) if args.value is not None else None
             print(json.dumps(cq.resolve(args.resolutions, a, b, args.conflict_id, args.choice,
