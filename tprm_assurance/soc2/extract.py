@@ -57,7 +57,7 @@ def extract(pages: list[str], source_name: str = "") -> dict:
     else:
         out["report_type"] = {"value": "UNKNOWN", "page": None}
 
-    # Period: "1st January 2025 - 30th June 2025". Type 1 reports say "as of <date>".
+    # Period: "1st March 2025 - 31st August 2025" (format example). Type 1 reports say "as of <date>".
     period_rx = re.compile(LONG_DATE + r"\s*[-–]\s*" + LONG_DATE)
     out["period"] = {"start": None, "end": None, "page": None}
     for idx, text in enumerate(pages):
@@ -74,7 +74,7 @@ def extract(pages: list[str], source_name: str = "") -> dict:
                 out["period"] = {"start": d, "end": d, "page": idx + 1}
                 break
 
-    # Report date: "Date: 21st July 2025" in the signature block. The cover's
+    # Report date: "Date: 20th September 2025" in the signature block (format example). The cover's
     # "Next Report Issue Date" is a different field and must not be mistaken for it.
     out["report_date"] = {"value": None, "page": None}
     out["next_report_due"] = {"value": None, "page": None}
@@ -177,7 +177,7 @@ def extract(pages: list[str], source_name: str = "") -> dict:
 
     # Test results: count clean results vs anything else that says "exception(s) noted".
     # The legend sentence 'noted by the phrase "No exceptions noted"' explains the convention and
-    # is not a result (S5 counted 144 instead of 143 before this). Only that exact phrase in double
+    # is not a result (report A was over-counted by one before this). Only that exact phrase in double
     # quotes is removed. Any other quoted or apostrophe-adjacent wording still counts, so a doubt
     # becomes a finding for the reviewer instead of a silent miss (fail closed; security review
     # 2026-11-10 found the earlier "strip any quoted span" version could hide a real exception).

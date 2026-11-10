@@ -47,7 +47,7 @@ def ex(**fields):
 
 
 def test_counts_dates_and_pages_are_not_sent_to_jev():
-    for c in (conflict("cuecs", "count", 12, 11), conflict("period", "end", "2025-06-30", "2025-07-01"),
+    for c in (conflict("cuecs", "count", 9, 8), conflict("period", "end", "2025-06-30", "2025-07-01"),
               conflict("report_date", "page", 9, 10)):
         p = plan(c, ex(), ex(), PAGES)
         assert p.questions == {} and p.reason
