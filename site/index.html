@@ -24,6 +24,7 @@
 
   /* Workpaper layout: text column plus a reference margin, as audit workpapers cite their evidence. */
   .wp { display: grid; grid-template-columns: minmax(0, 1fr) 190px; column-gap: 40px; }
+  .wp > * { min-width: 0; }  /* let wide tables scroll inside .scroll instead of widening the column */
   .wp > .ref { color: var(--soft); font-size: 14px; line-height: 1.5; padding-top: 6px; border-left: 2px solid var(--rule); padding-left: 14px; }
   .ref b { color: var(--ink); font-weight: 600; }
   @media (max-width: 820px) { .wp { grid-template-columns: 1fr; } .wp > .ref { border-left: 0; border-top: 2px solid var(--rule); padding: 10px 0 0; margin-top: 10px; } }
@@ -92,6 +93,25 @@
   .note { color: var(--soft); font-size: 14px; margin-top: 10px; }
   @media (max-width: 620px) { .row { grid-template-columns: 1fr; } .acts { justify-content: flex-start; } .pair { grid-template-columns: 1fr; } }
 
+  /* Start-to-finish walkthrough */
+  .walk .step { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; margin: 0 0 14px; padding: 0; scroll-margin-top: 16px; }
+  .step > header { display: flex; gap: 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
+  .step > header .n { width: 30px; height: 30px; border: 2px solid var(--ink); border-radius: 50%; font: 700 15px/26px var(--serif); text-align: center; flex: none; }
+  .step.done > header .n { background: var(--ink); color: #fff; }
+  .step > header h3 { margin: 0; font-size: 19px; }
+  .step .body { padding: 14px 18px; }
+  .stepnav { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .facts td.diff { background: var(--holdbg); }
+  .pagebox { font-family: var(--serif); background: #FAFCFB; border: 1px solid var(--rule); border-left: 3px solid var(--ink); padding: 12px 14px; margin: 10px 0 4px; font-size: 16px; line-height: 1.55; }
+  .pagebox .cap { font-family: var(--sans); font-size: 13px; color: var(--soft); display: block; margin-bottom: 4px; }
+  .dispute { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .jev { font-size: 15px; color: var(--relied); margin-top: 6px; } .hint { font-size: 15px; color: var(--soft); margin: 6px 0 0; }
+  .warn { background: var(--tickbg); color: var(--tick); padding: 10px 12px; border-radius: 4px; margin: 10px 0 0; font-size: 15px; }
+  .ctx { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 24px; margin-top: 10px; }
+  .ctx fieldset { border: 0; padding: 0; margin: 0; } .ctx legend { font-weight: 600; margin-bottom: 4px; padding: 0; }
+  .ctx label { display: block; font-size: 15px; margin: 3px 0; }
+  .walk input[type=text], .walk input[type=number] { font: inherit; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 4px; }
+  .log { margin-top: 12px; font-size: 14px; }
   ul.plain { padding-left: 20px; max-width: 68ch; } ul.plain li { margin-bottom: 8px; }
   footer { padding: 34px 0 60px; border-top: 1px solid var(--rule); color: var(--soft); font-size: 15px; }
   @media (prefers-reduced-motion: no-preference) {
@@ -107,7 +127,7 @@
   <div class="wp">
     <div>
       <h1>Can we rely on this vendor's SOC 2 report?</h1>
-      <p class="lede">A third-party risk tool that reads the report twice, once with rules and once with Claude, checks every
+      <p class="lede">A third-party risk tool that reads the report twice, once with text patterns and once with Claude, checks every
       disagreement against the page it came from, and leaves each decision to a person.</p>
     </div>
     <div class="ref"><b>What this page is</b><br>A summary of a working project, with a demo on a fictional report. Real reports are restricted-use documents and stay off the internet.</div>
@@ -117,13 +137,13 @@
     <figure class="exhibit" style="margin-left:0;margin-right:0">
       <div class="field"><strong>Which trust services categories does the examination cover?</strong>From a real report, anonymized.</div>
       <div class="readers">
-        <div class="reader wrong"><div class="who">Rules extractor</div><div class="what">All five</div></div>
+        <div class="reader wrong"><div class="who">Pattern reader</div><div class="what">All five</div></div>
         <div class="reader"><div class="who">Claude</div><div class="what">Security only</div></div>
         <div class="reader page"><div class="who">The scope page</div><div class="what">Security only</div></div>
       </div>
       <div class="verdict">
         <svg class="tickmark" viewBox="0 0 30 30" aria-hidden="true"><path class="tick-draw" d="M5 16 L12 23 L26 6" fill="none" stroke="#B8322A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <p>The readers disagreed, so the merge stopped until a reviewer checked the page and chose. Had the rules reading
+        <p>The readers disagreed, so the merge stopped until a reviewer checked the page and chose. Had the pattern reading
         gone through, a reviewer relying on Availability would have been told it was covered.</p>
       </div>
     </figure>
@@ -134,20 +154,20 @@
     <div class="wp">
       <div>
         <h2>Measured on two real reports</h2>
-        <p>Report A is the one the rules extractor was built from. Report B is a held-out report from a different audit
+        <p>Report A is the one the pattern reader was built from. Report B is a held-out report from a different audit
         firm; nothing was tuned on it before the run. Each answer key has 27 checks, written from the page text before
         any Claude run.</p>
         <div class="scroll">
         <table>
           <tr><th>Reader</th><th>Report A</th><th>Report B</th><th>Factual errors</th><th>Findings on B, vs the answer key</th><th>Cost per report</th></tr>
-          <tr><td>Rules, no AI</td><td class="num">27 / 27</td><td class="num">10 / 27</td><td>many on B</td><td>1 finding, and it was wrong; all 13 real findings missed</td><td class="num">$0</td></tr>
+          <tr><td>Patterns, no AI</td><td class="num">27 / 27</td><td class="num">10 / 27</td><td>many on B</td><td>1 finding, and it was wrong; all 13 real findings missed</td><td class="num">$0</td></tr>
           <tr class="lead"><td>Claude, page text</td><td class="num">25 / 27</td><td class="num">26 / 27</td><td class="num">0</td><td>the same 13</td><td class="num">$0.18 / $0.36</td></tr>
           <tr><td>Claude, PDF</td><td class="num">24 / 27</td><td class="num">25 / 27</td><td class="num">0</td><td>the same 13</td><td class="num">$0.51 / $1.19</td></tr>
         </table>
         </div>
         <p class="note">Every Claude miss was a page citation or spelling where the cited page also states the value.</p>
         <h3>What reading twice caught</h3>
-        <p>A bug in the rules extractor, which counted a legend sentence as a test result. And a mistake in the answer key
+        <p>A bug in the pattern reader, which counted a legend sentence as a test result. And a mistake in the answer key
         itself: it had no untested controls, while Claude found seven results reading "No testing performed". Untested
         controls are not evidence that controls work. The key was corrected after the run, and the correction is recorded.</p>
         <h3>The decision model that checks disagreements</h3>
@@ -165,11 +185,11 @@
       <div>
         <h2>How a review runs</h2>
         <ol class="steps">
-          <li><b>Read the report twice.</b> The rules extractor and Claude each return the same fields, every value with the page it came from.</li>
+          <li><b>Read the report twice.</b> The pattern reader and Claude each return the same fields, every value with the page it came from.</li>
           <li><b>Compare the readings.</b> Any field where they disagree goes to a queue. A disagreement that changes a reliance rule blocks the merge.</li>
           <li><b>Check the page.</b> Jev reads the cited page and suggests which reading it supports. The suggestion is advice; it resolves nothing.</li>
           <li><b>A person resolves each disagreement</b> by taking one reading or typing the value from the page. Every resolution is logged and bound to the exact pair of readings.</li>
-          <li><b>Apply the reliance rules.</b> Period and staleness, bridge letters, scope against the categories you need, carved-out providers, owners for complementary user controls, test exceptions.</li>
+          <li><b>Apply the <a href="#rules">reliance rules</a>.</b> Period and staleness, bridge letters, scope against the categories you need, carved-out providers, owners for complementary user controls, test exceptions.</li>
           <li><b>A person approves or rejects each finding.</b> Nothing is a finding until then. Decisions are appended to a log, never overwritten, and tied to a hash of the reading they were made on.</li>
         </ol>
       </div>
@@ -180,19 +200,49 @@
   <section id="try">
     <div class="wp">
       <div>
-        <h2>Try the review on a fictional report</h2>
-        <p>Example Vendor's report and both readings below are invented. Approve or reject findings, then open the
-        disagreements and see the merge stay blocked until each one is resolved. Nothing you click leaves this page.</p>
-        <div class="demo">
-          <div class="tabs" role="tablist">
-            <button role="tab" id="t-f" aria-selected="true" aria-controls="p-f">Proposed findings</button>
-            <button role="tab" id="t-c" aria-selected="false" aria-controls="p-c">Disagreements</button>
-          </div>
-          <div class="pane" id="p-f" role="tabpanel" aria-labelledby="t-f"></div>
-          <div class="pane" id="p-c" role="tabpanel" aria-labelledby="t-c" hidden></div>
-        </div>
+        <h2>Walk through a review, start to finish</h2>
+        <p>Example Vendor and its report are invented, and so are both readings. The suggestion from Jev is real: it was
+        recorded by running Jev on the invented pages. Nothing you click leaves this page.</p>
+        <div class="walk" id="walk"></div>
       </div>
-      <div class="ref"><b>Your context</b><br>Needs Security and Availability. Holds no provider reports. No owners assigned for the vendor's complementary user controls.<br><br>Change the context in the real tool and the findings recalculate.</div>
+      <div class="ref"><b>The real tool</b><br>Runs on the reviewer's machine: upload a PDF, read it with patterns and with Claude, and every decision below is written to a log file.<br><br><b>Cost on real reports</b><br>Claude: about $0.003 to $0.004 a page. Jev: well under a cent a review.</div>
+    </div>
+  </section>
+
+  <section id="rules">
+    <div class="wp">
+      <div>
+        <h2>The rules, in plain words</h2>
+        <p>The tool uses rules twice. Reading patterns pull facts out of the text: the date range after "for the period",
+        the categories named as applicable, each line saying "No exceptions noted". They are free and instant, and
+        brittle: built on one auditor's layout, they scored 10 of 27 on another's. Claude reads the same fields; where
+        the two readings disagree, a person decides.</p>
+        <p>Reliance rules then turn the facts into proposed findings. Each one names its source.</p>
+        <div class="scroll">
+        <table>
+          <tr><th>Proposed finding</th><th>When it fires</th><th>Source</th></tr>
+          <tr><td>Type 1 where you need Type 2</td><td>The report covers a single date, and you expect a period</td><td>Practitioner SOC 2 review method</td></tr>
+          <tr><td>Short period</td><td>A Type 2 period shorter than 6 months</td><td>Practitioner method ("commonly 6 or 12 months")</td></tr>
+          <tr><td>Bridge letter needed</td><td>The period ended more than 3 months ago and no bridge letter is on file</td><td>Practitioner method</td></tr>
+          <tr><td>Stale report</td><td>The period ended more than 15 months ago</td><td>Practitioner method</td></tr>
+          <tr><td>Qualified opinion</td><td>The auditor's opinion has an exception</td><td>Practitioner method</td></tr>
+          <tr><td>Adverse opinion or disclaimer</td><td>The auditor says the criteria were not met, or gives no opinion</td><td>Practitioner method</td></tr>
+          <tr><td>Opinion not read</td><td>Neither reading found the opinion</td><td>The tool's own safeguard</td></tr>
+          <tr><td>Category not in scope</td><td>A category you need was not examined</td><td>Practitioner method</td></tr>
+          <tr><td>Mixed scope wording</td><td>The scope names more categories in one place than another</td><td>Seen in a real report</td></tr>
+          <tr><td>Carved-out provider without assurance</td><td>A provider the vendor relies on was excluded, and you hold no report for it</td><td>Practitioner method</td></tr>
+          <tr><td>Customer controls without an owner</td><td>The report assumes controls at your end that nobody on your side owns</td><td>Practitioner method</td></tr>
+          <tr><td>No customer-controls section</td><td>The report lists none, which is unusual</td><td>Practitioner method</td></tr>
+          <tr><td>Exceptions in test results</td><td>Any result other than "No exceptions noted", including untested controls</td><td>Practitioner method; real reports</td></tr>
+        </table>
+        </div>
+        <h3>Changing the rules</h3>
+        <p>The numbers regulators leave to each organization, such as when a report counts as stale or how long before a
+        bridge letter is needed, sit in one policy file you can edit. Your context (the categories you need, the provider
+        reports you hold, who owns each customer control) changes which findings apply; try it in step 4 above. A new
+        kind of rule today means a few lines of code and a test.</p>
+      </div>
+      <div class="ref"><b>Sources</b><br>Thresholds come from an MIT-licensed practitioner SOC 2 review method; regulatory anchors are the 2023 interagency third-party risk guidance, GDPR Article 28 and NIST SP 800-53.</div>
     </div>
   </section>
 
@@ -219,80 +269,213 @@
 
 <script>
 (() => {
-  const findings = [
-    ["PERIOD_SHORT", "Type 2 period shorter than 6 months", "1 Jan to 30 Jun 2025, 5 months", 1],
-    ["REPORT_STALE", "Period ended over 15 months ago; ask for the successor report", "ended 30 Jun 2025", 1],
-    ["CATEGORY_WORDING_MIXED", "Scope names more categories in one place than another", "in scope: Security, Availability; also named: Confidentiality", 5],
-    ["CARVE_OUT_NO_ASSURANCE", "Carved-out provider with no assurance report on file", "Nimbus Cloud (NC)", 5],
-    ["CARVE_OUT_NO_ASSURANCE", "Carved-out provider with no assurance report on file", "Gitworks Inc", 5],
-    ["CARVE_OUT_NO_ASSURANCE", "Carved-out provider with no assurance report on file", "Ledgerly", 5],
-    ["CUEC_UNOWNED", "Complementary user entity controls with no internal owner", "9 controls, 0 owned", 28],
-    ["EXCEPTIONS_PRESENT", "Test results other than 'No exceptions noted'; triage each", "1 deviation, 118 clean", 33],
-  ].map(([rule, meaning, detail, page]) => ({ rule, meaning, detail, page, state: "proposed" }));
-  const conflicts = [
-    { field: "Categories in scope", a: "Security, Availability", b: "Security", page: 5 },
-    { field: "Categories also named", a: "Confidentiality", b: "Availability, Confidentiality", page: 5 },
-    { field: "CUEC count", a: "9", b: "8", page: 28 },
-    { field: "Subservice providers", a: "Nimbus Cloud (NC), Gitworks Inc, Ledgerly", b: "Nimbus cloud(NC), Gitworks Inc, Ledgerly", page: 5 },
-  ].map(c => ({ ...c, state: "open", took: "" }));
+  // Fictional report: the same invented data as data/sample/ in the repository.
+  const PAGES = {
+    1: "Example Vendor Inc. SOC 2 Type 2 Report on Example Vendor's Ledger Cloud system, relevant to Security and Availability, for the period 1 January 2025 to 30 June 2025.",
+    5: "Scope. We have examined Example Vendor Inc.'s description of its Ledger Cloud system for the period 1 January 2025 to 30 June 2025, and whether the controls in that description were suitably designed and worked as intended to meet the trust services criteria relevant to Security and Availability (applicable trust services criteria). Example Vendor also makes Confidentiality commitments to its customers; the Confidentiality category was not part of this examination. Subservice organizations. Example Vendor uses Nimbus Cloud (NC) for infrastructure hosting, Gitworks Inc for source code management, and Ledgerly for billing. The description excludes the controls of these subservice organizations (carve-out method), and our examination did not extend to them.",
+    28: "Complementary user entity controls. Example Vendor designed its controls on the assumption that each customer: (1) approves and periodically reviews which of its staff have Ledger Cloud accounts; (2) removes accounts promptly when staff leave; (3) enables multi-factor sign-in for its administrators; (4) protects the devices its staff use to reach Ledger Cloud; (5) reviews the activity reports Example Vendor provides; (6) reports suspected security incidents to Example Vendor promptly; (7) keeps its own copies of data it exports; (8) tests its own business continuity arrangements; (9) reviews and accepts changes to its service agreement.",
+    33: "Tests of controls and results. 118 controls were tested with the result No exceptions noted. One control had a deviation: for 1 of 25 sampled leavers, the account was removed 9 days after the leaving date, against a target of 2 days."
+  };
+  const A = { type: "SOC2_TYPE2", start: "2025-01-01", end: "2025-06-30", opinion: "UNQUALIFIED",
+              inScope: ["Security", "Availability"], also: ["Confidentiality"],
+              providers: ["Nimbus Cloud (NC)", "Gitworks Inc", "Ledgerly"], cuecs: 9, clean: 118, exceptions: 1 };
+  const B = { ...A, inScope: ["Security"], also: ["Availability", "Confidentiality"],
+              providers: ["Nimbus cloud(NC)", "Gitworks Inc", "Ledgerly"], cuecs: 8 };
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const fmt = s => { const d = day(s); return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`; };
+  const list = v => Array.isArray(v) ? v.join(", ") : String(v);
+  const FIELDS = [
+    ["type", "Report type", 1, v => v === "SOC2_TYPE2" ? "Type 2" : "Type 1"],
+    ["start", "Period", 1, (v, x) => `${fmt(x.start)} to ${fmt(x.end)}`],
+    ["opinion", "Auditor's opinion", 7, v => v === "UNQUALIFIED" ? "Unqualified" : v],
+    ["inScope", "Categories in scope", 5, list],
+    ["also", "Categories named elsewhere", 5, list],
+    ["providers", "Carved-out providers", 5, list],
+    ["cuecs", "Customer controls (CUECs)", 28, String],
+    ["exceptions", "Results with exceptions", 33, (v, x) => `${v} (${x.clean} clean)`],
+  ];
+  const DISPUTES = [
+    { key: "inScope", label: "Categories in scope", page: 5,
+      jev: "Jev, asked whether page 5 names Availability as a category this examination covers: yes, 0.99. It suggests the pattern reading." },
+    { key: "also", label: "Categories named elsewhere", page: 5, hint: "Jev has no question for this field. Read the page." },
+    { key: "cuecs", label: "Customer controls (CUEC count)", page: 28, hint: "Counts stay with a person; Jev does not count reliably. Count the list on the page." },
+    { key: "providers", label: "Carved-out providers", page: 5, hint: "Same three names; only spacing and capitals differ, so the code settles it as the pattern spelling." },
+  ];
+  const RULES = {
+    TYPE1: "Type 1 report where you need Type 2", SHORT: "Type 2 period shorter than 6 months",
+    BRIDGE: "Period ended over 3 months ago; ask for a bridge letter", STALE: "Period ended over 15 months ago; ask for the successor report",
+    SCOPE: "A category you need is not in scope", MIXED: "Scope names more categories in one place than another",
+    CARVE: "Carved-out provider with no assurance report on file", CUEC: "Customer controls with no owner on your side",
+    NOCUEC: "No customer-controls section", EXC: "Test results other than 'No exceptions noted'; triage each",
+  };
+
+  const fresh = () => ({ step: 1, readA: false, readB: false, res: {}, open: {}, merged: null, fp: "",
+    ctx: { needs: new Set(["Security", "Availability"]), held: new Set(), owners: 0, bridge: false, type2: true },
+    dec: {}, log: [], reviewer: "" });
+  let st = fresh();
+
+  function monthsBetween(a, b) {
+    let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+    if (b.getDate() < a.getDate()) m -= 1;
+    return m;
+  }
+  function findings(x, c) {
+    const out = [], add = (rule, detail, page, key = rule) => out.push({ id: key, rule, meaning: RULES[rule], detail, page });
+    if (x.type === "SOC2_TYPE1" && c.type2) add("TYPE1", "the report covers a single date", 1);
+    const len = monthsBetween(day(x.start), day(x.end));
+    if (x.type === "SOC2_TYPE2" && len < 6) add("SHORT", `${fmt(x.start)} to ${fmt(x.end)} is ${len} months`, 1);
+    const age = monthsBetween(day(x.end), new Date());
+    if (age > 15) add("STALE", `ended ${fmt(x.end)}, ${age} months ago`, 1);
+    else if (age > 3 && !c.bridge) add("BRIDGE", `ended ${fmt(x.end)}, ${age} months ago`, 1);
+    const missing = [...c.needs].filter(k => !x.inScope.includes(k));
+    if (missing.length) add("SCOPE", `you need ${missing.join(", ")}; in scope: ${x.inScope.join(", ")}`, 5);
+    if (x.also.length) add("MIXED", `in scope: ${x.inScope.join(", ")}; also named: ${x.also.join(", ")}`, 5);
+    x.providers.forEach(p => { if (![...c.held].some(h => p.toLowerCase().includes(h.toLowerCase()))) add("CARVE", p, 5, "CARVE:" + p); });
+    if (x.cuecs === 0) add("NOCUEC", "no customer-controls section found", 28);
+    else if (x.cuecs - c.owners > 0) add("CUEC", `${x.cuecs} controls, ${c.owners} with an owner`, 28);
+    if (x.exceptions > 0) add("EXC", `${x.exceptions} result with an exception, ${x.clean} clean`, 33);
+    return out;
+  }
+
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  const pf = document.getElementById("p-f"), pc = document.getElementById("p-c");
+  const btn = (label, cls, on, disabled) => { const b = el("button", cls, label); b.type = "button"; b.onclick = on; b.disabled = !!disabled; return b; };
+  const go = n => { st.step = Math.max(st.step, n); draw(); const t = document.getElementById("step-" + n); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  function pageBox(n) { const q = el("div", "pagebox"); q.append(el("span", "cap", `Page ${n} of the fictional report`), document.createTextNode(PAGES[n])); return q; }
 
-  function drawFindings() {
-    pf.replaceChildren();
-    findings.forEach(f => {
-      const row = el("div", "row"), left = el("div");
-      left.append(el("div", "t", f.meaning), el("div", "d", `${f.detail} · page ${f.page}`));
-      const acts = el("div", "acts");
-      acts.append(el("span", `state s-${f.state}`, f.state === "proposed" ? "Proposed" : f.state === "approved" ? "Approved" : "Rejected"));
-      if (f.state === "proposed") {
-        const ok = el("button", "btn", "Approve"), no = el("button", "btn alt", "Reject");
-        ok.onclick = () => { f.state = "approved"; drawFindings(); };
-        no.onclick = () => { f.state = "rejected"; drawFindings(); };
-        acts.append(ok, no);
+  function step(n, title, body) {
+    const s = el("section", "step" + (st.step > n ? " done" : "")); s.id = "step-" + n;
+    const h = el("header"); h.append(el("span", "n", String(n)), el("h3", null, title)); s.append(h);
+    const b = el("div", "body"); body(b); s.append(b); return s;
+  }
+
+  function draw() {
+    const w = document.getElementById("walk"); w.replaceChildren();
+    w.append(step(1, "Load the report", b => {
+      const card = el("div", "pagebox");
+      card.append(el("span", "cap", "Fictional report"), document.createTextNode("Example Vendor Inc. — SOC 2 Type 2 on its Ledger Cloud system, 60 pages, from Example Assurance LLP."));
+      b.append(card);
+      if (st.step === 1) { const nav = el("div", "stepnav"); nav.append(btn("Load the report", "btn", () => go(2))); b.append(nav); }
+      else b.append(el("p", "hint", "Loaded. In the real tool you upload the PDF and it stays on your machine."));
+    }));
+    if (st.step < 2) return;
+    w.append(step(2, "Read it twice", b => {
+      b.append(el("p", "hint", "The pattern reader matches known phrases in the text: free and instant. Claude reads the same fields from the page text and cites a page for each."));
+      const nav = el("div", "stepnav");
+      nav.append(btn(st.readA ? "Read with patterns ✓" : "Read with patterns (no AI)", "btn alt", () => { st.readA = true; draw(); }, st.readA),
+                 btn(st.readB ? "Read with Claude ✓" : "Read with Claude", "btn alt", () => { st.readB = true; draw(); }, st.readB));
+      b.append(nav);
+      const t = el("table", "facts"); const hr = el("tr"); ["Field", "Patterns", "Claude", "Page"].forEach(x => hr.append(el("th", null, x))); t.append(hr);
+      FIELDS.forEach(([k, label, page, f]) => {
+        const r = el("tr"), va = f(A[k], A), vb = f(B[k], B), diff = st.readA && st.readB && va !== vb;
+        r.append(el("td", null, label), el("td", diff ? "diff" : null, st.readA ? va : "—"), el("td", diff ? "diff" : null, st.readB ? vb : "—"), el("td", "num", String(page)));
+        t.append(r);
+      });
+      const sc = el("div", "scroll"); sc.style.marginTop = "12px"; sc.append(t); b.append(sc);
+      if (st.readA && st.readB) {
+        b.append(el("p", "hint", "Four fields disagree (shaded). On a real report this size, the Claude reading costs about $0.20 and takes under a minute."));
+        if (st.step === 2) { const n2 = el("div", "stepnav"); n2.append(btn("Compare the readings", "btn", () => go(3))); b.append(n2); }
       }
-      row.append(left, acts); pf.append(row);
-    });
-    const done = findings.filter(f => f.state !== "proposed").length;
-    pf.append(el("p", "note", `${done} of ${findings.length} decided. In the tool, each decision is logged with the reviewer's name and bound to this reading.`));
-  }
-
-  function drawConflicts() {
-    pc.replaceChildren();
-    const open = conflicts.filter(c => c.state === "open").length;
-    pc.append(el("div", `gate ${open ? "shut" : "open"}`, open ? `Merge blocked: ${open} disagreement${open > 1 ? "s" : ""} that change a reliance rule still open.` : "Merge allowed: every disagreement has a reviewer's decision."));
-    conflicts.forEach(c => {
-      const row = el("div", "row"), left = el("div");
-      const t = el("div", "t", c.field); t.append(el("span", "sev", "changes a rule"));
-      const pair = el("div", "pair");
-      pair.append(el("div", null, ""), el("div", null, ""));
-      pair.children[0].append(el("span", null, "Rules: "), document.createTextNode(c.a));
-      pair.children[1].append(el("span", null, "Claude: "), document.createTextNode(c.b));
-      left.append(t, pair, el("div", "d", `Check page ${c.page}`));
-      const acts = el("div", "acts");
-      acts.append(el("span", `state s-${c.state}`, c.state === "open" ? "Open" : `Resolved: ${c.took}`));
-      if (c.state === "open") {
-        const ta = el("button", "btn alt", "Take rules"), tb = el("button", "btn alt", "Take Claude");
-        ta.onclick = () => { c.state = "resolved"; c.took = "rules"; drawConflicts(); };
-        tb.onclick = () => { c.state = "resolved"; c.took = "Claude"; drawConflicts(); };
-        acts.append(ta, tb);
+    }));
+    if (st.step < 3) return;
+    w.append(step(3, "Settle each disagreement", b => {
+      const open = DISPUTES.filter(d => !st.res[d.key]).length;
+      b.append(el("div", `gate ${open ? "shut" : "open"}`, open ? `Merge blocked: ${open} disagreement${open > 1 ? "s" : ""} that change a reliance rule still open.` : "Merge allowed: each disagreement has a reviewer's decision."));
+      DISPUTES.forEach(d => {
+        const row = el("div", "dispute"), t = el("div", "t", d.label); t.append(el("span", "sev", "changes a rule"));
+        const pair = el("div", "pair"), pa = el("div"), pb = el("div");
+        pa.append(el("span", null, "Patterns: "), document.createTextNode(list(A[d.key]))); pb.append(el("span", null, "Claude: "), document.createTextNode(list(B[d.key])));
+        pair.append(pa, pb); row.append(t, pair);
+        if (d.jev) row.append(el("div", "jev", d.jev)); else row.append(el("div", "hint", d.hint));
+        const acts = el("div", "stepnav");
+        acts.append(btn(st.open[d.key] ? `Hide page ${d.page}` : `Show page ${d.page}`, "btn alt", () => { st.open[d.key] = !st.open[d.key]; draw(); }));
+        if (st.merged) acts.append(el("span", "state s-resolved", `Took ${st.res[d.key] === "a" ? "patterns" : "Claude"}`));
+        else if (st.res[d.key]) { acts.append(el("span", "state s-resolved", `Took ${st.res[d.key] === "a" ? "patterns" : "Claude"}`), btn("Change", "btn alt", () => { delete st.res[d.key]; draw(); })); }
+        else acts.append(btn("Take patterns", "btn", () => { st.res[d.key] = "a"; draw(); }), btn("Take Claude", "btn", () => { st.res[d.key] = "b"; draw(); }));
+        row.append(acts);
+        if (st.open[d.key]) row.append(pageBox(d.page));
+        b.append(row);
+      });
+      if (!st.merged) {
+        const nav = el("div", "stepnav");
+        nav.append(btn("Merge into one reading", "btn", async () => {
+          st.merged = {}; Object.keys(A).forEach(k => st.merged[k] = A[k]);
+          DISPUTES.forEach(d => { st.merged[d.key] = st.res[d.key] === "b" ? B[d.key] : A[d.key]; });
+          try {
+            const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(st.merged)));
+            st.fp = [...new Uint8Array(h)].slice(0, 8).map(x => x.toString(16).padStart(2, "0")).join("");
+          } catch (e) { st.fp = "not available"; }
+          go(4);
+        }, open > 0));
+        b.append(nav);
+      } else {
+        b.append(el("p", "hint", `Merged. The merged reading has its own fingerprint (${st.fp}); every later decision is tied to it.`));
+        if (st.res.inScope === "b") b.append(el("div", "warn", "You took Claude's scope. Page 5 says Security and Availability were examined, so the next steps will report Availability as not covered. In the tool you would reopen the queue."));
       }
-      row.append(left, acts); pc.append(row);
-    });
-    const merge = el("button", "btn", "Merge into one reading");
-    merge.disabled = open > 0;
-    merge.onclick = () => { merge.replaceWith(el("p", "note", "Merged. The new reading has its own hash, so findings are decided on it afresh.")); };
-    const foot = el("div"); foot.style.marginTop = "14px"; foot.append(merge); pc.append(foot);
+    }));
+    if (st.step < 4) return;
+    const found = () => findings(st.merged, st.ctx);
+    w.append(step(4, "Set your context", b => {
+      b.append(el("p", "hint", "What you rely on and what you already hold. It changes which findings apply; it is not a fact about the vendor."));
+      const grid = el("div", "ctx");
+      const fs1 = el("fieldset"); fs1.append(el("legend", null, "Categories you need"));
+      ["Security", "Availability", "Processing Integrity", "Confidentiality", "Privacy"].forEach(c => {
+        const l = el("label"), i = el("input"); i.type = "checkbox"; i.checked = st.ctx.needs.has(c);
+        i.onchange = () => { i.checked ? st.ctx.needs.add(c) : st.ctx.needs.delete(c); draw(); }; l.append(i, document.createTextNode(" " + c)); fs1.append(l);
+      });
+      const fs2 = el("fieldset"); fs2.append(el("legend", null, "Provider reports you hold"));
+      st.merged.providers.forEach(p => {
+        const l = el("label"), i = el("input"); i.type = "checkbox"; i.checked = st.ctx.held.has(p);
+        i.onchange = () => { i.checked ? st.ctx.held.add(p) : st.ctx.held.delete(p); draw(); }; l.append(i, document.createTextNode(" " + p)); fs2.append(l);
+      });
+      const fs3 = el("fieldset"); fs3.append(el("legend", null, "Your side"));
+      const l1 = el("label"), bi = el("input"); bi.type = "checkbox"; bi.checked = st.ctx.bridge; bi.onchange = () => { st.ctx.bridge = bi.checked; draw(); };
+      l1.append(bi, document.createTextNode(" Bridge letter on file"));
+      const l2 = el("label"), ni = el("input"); ni.type = "number"; ni.min = "0"; ni.max = String(st.merged.cuecs); ni.value = String(st.ctx.owners); ni.style.width = "70px";
+      ni.onchange = () => { st.ctx.owners = Math.max(0, Math.min(st.merged.cuecs, parseInt(ni.value || "0", 10) || 0)); draw(); };
+      l2.append(document.createTextNode("Customer controls with an owner: "), ni);
+      fs3.append(l1, l2);
+      grid.append(fs1, fs2, fs3); b.append(grid);
+      b.append(el("p", "hint", `${found().length} proposed findings with this context.`));
+      if (st.step === 4) { const nav = el("div", "stepnav"); nav.append(btn("Review the findings", "btn", () => go(5))); b.append(nav); }
+    }));
+    if (st.step < 5) return;
+    w.append(step(5, "Approve or reject each finding", b => {
+      b.append(el("p", "hint", "Nothing is a finding until a named person approves it. Each decision is added to the log below; none is overwritten."));
+      const nl = el("label"), ri = el("input"); ri.type = "text"; ri.placeholder = "Your name"; ri.value = st.reviewer; ri.maxLength = 60;
+      ri.oninput = () => { st.reviewer = ri.value.trim(); }; nl.append(document.createTextNode("Reviewer "), ri); b.append(nl);
+      const fs = found();
+      fs.forEach(f => {
+        const row = el("div", "row"), left = el("div"); left.append(el("div", "t", f.meaning), el("div", "d", `${f.detail} · page ${f.page}`));
+        const acts = el("div", "acts"), state = st.dec[f.id];
+        acts.append(el("span", `state s-${state || "proposed"}`, state === "approved" ? "Approved" : state === "rejected" ? "Rejected" : "Proposed"));
+        if (!state) {
+          const decide = kind => () => {
+            if (!st.reviewer) { ri.focus(); ri.setCustomValidity("Add your name first"); ri.reportValidity(); setTimeout(() => ri.setCustomValidity(""), 1500); return; }
+            st.dec[f.id] = kind; st.log.push({ at: new Date(), who: st.reviewer, what: kind, finding: f.meaning + (f.rule === "CARVE" ? ` (${f.detail})` : "") });
+            draw();
+          };
+          acts.append(btn("Approve", "btn", decide("approved")), btn("Reject", "btn alt", decide("rejected")));
+        }
+        row.append(left, acts); b.append(row);
+      });
+      if (st.log.length) {
+        const t = el("table", "log"), hr = el("tr"); ["Time", "Reviewer", "Decision", "Finding", "Reading"].forEach(x => hr.append(el("th", null, x))); t.append(hr);
+        st.log.forEach(e => { const r = el("tr"); [e.at.toLocaleTimeString(), e.who, e.what, e.finding, st.fp].forEach(x => r.append(el("td", null, x))); t.append(r); });
+        const sc = el("div", "scroll"); sc.append(t); b.append(sc);
+      }
+      const left = fs.filter(f => !st.dec[f.id]).length;
+      if (st.step === 5) { const nav = el("div", "stepnav"); nav.append(btn(left ? `${left} still to decide` : "Finish the review", "btn", () => go(6), left > 0)); b.append(nav); }
+    }));
+    if (st.step < 6) return;
+    w.append(step(6, "Done", b => {
+      const fs = found(), ok = fs.filter(f => st.dec[f.id] === "approved");
+      b.append(el("p", null, `${ok.length} finding${ok.length === 1 ? "" : "s"} approved, ${fs.length - ok.length} rejected, ${st.log.length} entries in the log. The approved findings are the follow-ups for this vendor: requests to send, owners to assign, or risks to accept.`));
+      const ul = el("ul", "plain"); ok.forEach(f => ul.append(el("li", null, `${f.meaning} — ${f.detail}`))); b.append(ul);
+      const nav = el("div", "stepnav"); nav.append(btn("Start again", "btn alt", () => { st = fresh(); draw(); document.getElementById("try").scrollIntoView({ behavior: "smooth" }); })); b.append(nav);
+    }));
   }
-
-  const tf = document.getElementById("t-f"), tc = document.getElementById("t-c");
-  function show(which) {
-    const f = which === "f";
-    tf.setAttribute("aria-selected", f); tc.setAttribute("aria-selected", !f);
-    pf.hidden = !f; pc.hidden = f;
-  }
-  tf.onclick = () => show("f"); tc.onclick = () => show("c");
-  drawFindings(); drawConflicts();
+  draw();
 })();
 </script>
 </body>

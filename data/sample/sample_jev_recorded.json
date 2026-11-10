@@ -1,0 +1,46 @@
+{
+ "_about": "Real Jev (jev-1.14.0) answers recorded 2026-11-10 on the SYNTHETIC sample pages, rules reading vs the synthetic second reading.",
+ "results": [
+  {
+   "conflict": "categories.also_mentioned",
+   "status": "NOT_ASKED",
+   "choice": null,
+   "value": null,
+   "reason": "no Jev question defined for this field",
+   "answers": {}
+  },
+  {
+   "conflict": "categories.in_scope",
+   "status": "SUGGESTED",
+   "choice": "a",
+   "value": [
+    "Security",
+    "Availability"
+   ],
+   "reason": "the page supports A's list",
+   "answers": {
+    "Does `page_5` name Availability as one of the trust services categories that this examination covers?": 0.99
+   }
+  },
+  {
+   "conflict": "cuecs.count",
+   "status": "NOT_ASKED",
+   "choice": null,
+   "value": null,
+   "reason": "counting stays in code (Jev does not count reliably)",
+   "answers": {}
+  },
+  {
+   "conflict": "subservice_orgs.values",
+   "status": "SUGGESTED",
+   "choice": "a",
+   "value": [
+    "Nimbus Cloud (NC)",
+    "Gitworks Inc",
+    "Ledgerly"
+   ],
+   "reason": "same items; only spelling differs (settled in code, Jev not asked)",
+   "answers": {}
+  }
+ ]
+}
