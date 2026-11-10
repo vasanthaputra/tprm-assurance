@@ -141,3 +141,21 @@ def test_decisions_redirect_so_a_refresh_does_not_repeat_them(client):
     log = (client.app.state.workspace / rid / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
     client.get(r.headers["location"])                      # the "refresh"
     assert len((client.app.state.workspace / rid / "decisions.jsonl").read_text(encoding="utf-8").splitlines()) == len(log) == 1
+
+
+def test_three_pass_review_end_to_end(client):
+    rid, t = add_sample(client)
+    page = client.get(f"/r/{rid}/passes").text
+    assert "Pass 1: pattern code" in page and "Pass 2: Jev" in page and "Pass 3: Claude" in page
+    assert "Merge blocked" in page
+    r = client.post(f"/r/{rid}/run-jev", data={"csrf": t})          # stand-in Jev, invented sample pages
+    assert r.status_code == 200 and (client.app.state.workspace / rid / "jev.json").exists()
+    page = client.get(f"/r/{rid}/passes").text
+    ids = re.findall(r'name="row_id" value="([^"]+)"', page)
+    assert ids
+    for row_id in ids:
+        choice = re.search(rf'value="{re.escape(row_id)}">\s*<select name="choice"><option value="([^"]+)"', page).group(1)
+        client.post(f"/r/{rid}/passes/resolve", data={"row_id": row_id, "choice": choice, "reviewer": "me", "csrf": t})
+    done = client.post(f"/r/{rid}/passes/merge", data={"csrf": t}, follow_redirects=False)
+    assert done.status_code == 303 and "ex=merged" in done.headers["location"]
+    assert FAKE_KEY not in page

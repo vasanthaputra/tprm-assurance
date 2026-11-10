@@ -31,6 +31,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..register import load_policy
 from ..soc2 import conflicts as cq
+from ..soc2 import passes as px
 from ..soc2.extract import CATEGORIES as CATEGORIES_ORDER
 from ..soc2.reliance import load_context, propose, report_hash
 from ..soc2.review import apply_decisions, decide
@@ -38,7 +39,8 @@ from ..soc2.review import apply_decisions, decide
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 EXTRACTIONS = ["rules", "claude-text", "merged"]
-LABELS = {"rules": "Rules (no AI)", "claude-text": "Claude (page text)", "merged": "Merged (after review)"}
+LABELS = {"rules": "Pass 1: pattern code", "jev": "Pass 2: Jev", "claude-text": "Pass 3: Claude",
+          "merged": "Merged (after review)"}
 RID = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
 MAX_UPLOAD = 40 * 1024 * 1024
 FACT_ROWS = [("report_type", "value"), ("period", "start"), ("period", "end"), ("report_date", "value"),
@@ -118,7 +120,7 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
 
     def read_ex(d: Path, name: str) -> dict | None:
         p = d / f"{name}.json"
-        return json.loads(p.read_text(encoding="utf-8")) if name in EXTRACTIONS and p.exists() else None
+        return json.loads(p.read_text(encoding="utf-8")) if name in EXTRACTIONS + ["jev"] and p.exists() else None
 
     def context(d: Path) -> dict:
         p = d / "context.yaml"
@@ -127,6 +129,15 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
             base["as_of"] = date.today().isoformat()
             p.write_text(yaml.safe_dump(base, sort_keys=False), encoding="utf-8")
         return load_context(p)
+
+    def report_pages(d: Path) -> list[str] | None:
+        if (d / "pages.json").exists():
+            raw = json.loads((d / "pages.json").read_text(encoding="utf-8"))
+            n = max(int(k) for k in raw if k.isdigit())
+            return [raw.get(str(i), "") for i in range(1, n + 1)]
+        if (d / "report.pdf").exists():
+            return pages_reader(d / "report.pdf")
+        return None
 
     def available(d: Path) -> list[str]:
         return [n for n in EXTRACTIONS if (d / f"{n}.json").exists()]
@@ -188,7 +199,8 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         check_csrf(csrf)
         d = ws / "sample-example-vendor"
         d.mkdir(exist_ok=True)
-        for src, dst in (("sample_soc2_extraction.json", "rules.json"), ("sample_soc2_extraction_b.json", "claude-text.json")):
+        for src, dst in (("sample_soc2_extraction.json", "rules.json"), ("sample_soc2_extraction_b.json", "claude-text.json"),
+                         ("sample_soc2_pages.json", "pages.json")):
             (d / dst).write_text((ROOT / "data" / "sample" / src).read_text(encoding="utf-8"), encoding="utf-8")
         return RedirectResponse(f"/r/{d.name}?ex=rules", status_code=303)
 
@@ -211,7 +223,7 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         return report_page(request, rid, ex, msg=m[:300])
 
     @app.post("/r/{rid}/extract", response_class=HTMLResponse)
-    def extract(request: Request, rid: str, which: str = Form(...), csrf: str = Form("")):
+    def extract(request: Request, rid: str, which: str = Form(...), csrf: str = Form(""), back: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
         pdf = d / "report.pdf"
@@ -236,6 +248,8 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
             return report_page(request, rid, err=f"Extraction failed: {type(e).__name__}: {e}", status=500)
         data["source_file"] = "report.pdf" if data.get("source_file") is None else data["source_file"]
         (d / f"{which}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+        if back == "passes":
+            return RedirectResponse(f"/r/{rid}/passes?m={quote(msg)}", status_code=303)
         return RedirectResponse(f"/r/{rid}?ex={which}&m={quote(msg)}", status_code=303)
 
     @app.post("/r/{rid}/context", response_class=HTMLResponse)
@@ -326,6 +340,93 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
             return conflicts_page(request, rid, a, b, err=f"Merge refused: {e}", status=409)
         (d / "merged.json").write_text(json.dumps(merged, indent=2), encoding="utf-8")
         return RedirectResponse(f"/r/{rid}?ex=merged", status_code=303)
+
+    # ---- 3-pass review -----------------------------------------------------------------
+    def pass_readings(d: Path) -> dict:
+        return {n: read_ex(d, n) for n in px.PASSES if read_ex(d, n) is not None}
+
+    def show(v) -> str:
+        if v is px.MISSING:
+            return ""
+        if isinstance(v, list):
+            return ", ".join(map(str, v)) or "(none)"
+        return "(none)" if v is None else str(v)
+
+    def majority(r) -> str:
+        """Pre-select the pass whose answer most passes share (Claude on a tie). Only a default:
+        the reviewer still chooses and submits."""
+        present = {n: cq._norm(v) for n, v in r.values.items() if v is not px.MISSING}
+        votes = {n: sum(1 for w in present.values() if w == v) for n, v in present.items()}
+        return max(present, key=lambda n: (votes[n], n == "claude-text"), default="manual")
+
+    def passes_page(request: Request, rid: str, msg: str = "", err: str = "", status: int = 200):
+        d = rdir(rid)
+        readings = pass_readings(d)
+        gate = cq.gate_severity(policy)
+        rows, blocked = [], []
+        if readings:
+            try:
+                found = px.apply_resolutions(px.compare(readings), readings, d / "passes.jsonl")
+            except ValueError as e:
+                found, err = [], str(e)
+            blocked = px.blocking(found, gate)
+            for r in found:
+                rows.append({"id": r.id, "severity": r.severity, "agree": r.agree, "status": r.status, "note": r.note,
+                             "cells": [(n, show(r.values.get(n, px.MISSING)), n in readings) for n in px.PASSES],
+                             "choices": [n for n in px.PASSES if r.values.get(n, px.MISSING) is not px.MISSING],
+                             "suggest": majority(r), "resolution": r.resolution})
+        rows.sort(key=lambda r: (r["agree"], r["severity"] != "HIGH"))
+        pages_ok = report_pages(d) is not None if readings else False
+        return render(request, "passes.html", status, rid=rid, readings=readings, rows=rows, gate=gate,
+                      blocked=blocked, passes=px.PASSES, has_pdf=(d / "report.pdf").exists(),
+                      claude_ok=has("ANTHROPIC_API_KEY"), jev_ok=has("TYPESAFE_API_KEY") and pages_ok,
+                      n_open=sum(1 for r in rows if r["status"] == "OPEN"), msg=msg, err=err)
+
+    @app.get("/r/{rid}/passes", response_class=HTMLResponse)
+    def passes_view(request: Request, rid: str, m: str = ""):
+        return passes_page(request, rid, msg=m[:300])
+
+    @app.post("/r/{rid}/run-jev", response_class=HTMLResponse)
+    def run_jev(request: Request, rid: str, csrf: str = Form("")):
+        check_csrf(csrf)
+        d = rdir(rid)
+        readings = {n: v for n, v in pass_readings(d).items() if n != "jev"}
+        pages = report_pages(d)
+        if not readings or not pages:
+            return passes_page(request, rid, err="Jev needs the report's page text and at least one other pass.", status=400)
+        try:
+            jev = px.jev_pass(readings, pages, jev_client_factory(), policy)
+        except Exception as e:
+            return passes_page(request, rid, err=f"Jev pass failed: {type(e).__name__}: {e}", status=500)
+        (d / "jev.json").write_text(json.dumps(jev, indent=2), encoding="utf-8")
+        answered = sum(1 for f in jev["_jev"]["fields"].values() if f.get("status") == "answered")
+        note = f"Jev answered {answered} of {len(px.JEV_FIELDS)} fixed-choice fields."
+        return RedirectResponse(f"/r/{rid}/passes?m={quote(note)}", status_code=303)
+
+    @app.post("/r/{rid}/passes/resolve", response_class=HTMLResponse)
+    def passes_resolve(request: Request, rid: str, row_id: str = Form(...), choice: str = Form(...),
+                       reviewer: str = Form(""), value: str = Form(""), note: str = Form(""), csrf: str = Form("")):
+        check_csrf(csrf)
+        d = rdir(rid)
+        try:
+            v = json.loads(value) if choice == "manual" and value.strip() else None
+            px.resolve(d / "passes.jsonl", pass_readings(d), row_id, choice, reviewer, v, note)
+        except (ValueError, json.JSONDecodeError) as e:
+            return passes_page(request, rid, err=f"Not resolved: {e}", status=400)
+        return RedirectResponse(f"/r/{rid}/passes", status_code=303)
+
+    @app.post("/r/{rid}/passes/merge")
+    def passes_merge(request: Request, rid: str, csrf: str = Form("")):
+        check_csrf(csrf)
+        d = rdir(rid)
+        try:
+            merged = px.merge(pass_readings(d), d / "passes.jsonl", policy)
+        except cq.GateBlocked as e:
+            return passes_page(request, rid, err=f"Merge refused: {e}", status=409)
+        except ValueError as e:
+            return passes_page(request, rid, err=str(e), status=400)
+        (d / "merged.json").write_text(json.dumps(merged, indent=2), encoding="utf-8")
+        return RedirectResponse(f"/r/{rid}?ex=merged&m={quote('Merged the three passes. Findings below use the merged reading.')}", status_code=303)
 
     return app
 

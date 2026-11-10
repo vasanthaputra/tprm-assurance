@@ -66,6 +66,21 @@ Status: measured 2026-11-10 ([results](docs/results_2026-11-10.md)). Planted-err
 
 Output: [`data/sample/sample_report.md`](data/sample/sample_report.md), an exposure-by-tier summary, findings by rule with their source, then every finding.
 
+## 3-pass review
+
+The same report text goes through three independent passes, and a person settles every field they disagree on:
+
+| Pass | What it is | Reads |
+|---|---|---|
+| 1. Pattern code | our own text-matching rules (`soc2/extract.py`), no AI, free | every field |
+| 2. Jev | TypeSafe's decision model answers fixed-choice questions on the cited page (`soc2/passes.py`) | report type, opinion, categories in scope, whether each provider is named; not names, dates or counts |
+| 3. Claude | the Claude API reads the page text, each value with its page (`soc2/llm.py`) | every field |
+
+In the web app, open a report and choose **3-pass review**: run the passes, see each field's three answers side by
+side, resolve the rows that disagree (take one pass's value or type the value from the page), and merge. The merge is
+refused while a disagreement that decides a reliance rule is open. Resolutions are logged and bound to a hash of all
+three readings.
+
 ## Web app (local)
 
 ```bash

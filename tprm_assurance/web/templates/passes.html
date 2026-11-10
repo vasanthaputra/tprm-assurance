@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}3-pass review · {{ rid }}{% endblock %}
+{% block body %}
+<p class="muted"><a href="/">Reports</a> / <a href="/r/{{ rid }}">{{ rid }}</a> / 3-pass review</p>
+<h1>3-pass review</h1>
+<p class="muted">The same report text goes through three independent passes. Wherever they disagree, you decide, with the page in front of you.
+HIGH means the field decides whether a reliance rule fires.</p>
+
+<div class="grid3">
+  <div class="card pass">
+    <b>Pass 1: pattern code</b>
+    <p class="muted">Our own text-matching rules. No AI, free, instant. Brittle on report layouts it was not built for.</p>
+    {% if readings.rules %}<span class="badge RESOLVED">done</span>
+    {% elif has_pdf %}<form method="post" action="/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="which" value="rules"><input type="hidden" name="back" value="passes"><button type="submit">Run pass 1</button></form>
+    {% else %}<span class="muted">needs the PDF</span>{% endif %}
+  </div>
+  <div class="card pass">
+    <b>Pass 2: Jev</b>
+    <p class="muted">TypeSafe's decision model answers fixed-choice questions on the cited page: report type, opinion, categories in scope, whether each provider is named. It cannot read names, dates or counts.</p>
+    {% if readings.jev %}<span class="badge RESOLVED">done</span>
+    {% elif jev_ok and (readings.rules or readings['claude-text']) %}<form method="post" action="/r/{{ rid }}/run-jev"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit">Run pass 2</button></form><span class="muted">well under a cent</span>
+    {% else %}<span class="muted">needs pass 1 or 3, the page text and a TypeSafe key</span>{% endif %}
+  </div>
+  <div class="card pass">
+    <b>Pass 3: Claude</b>
+    <p class="muted">The Claude API reads every field again, each with the page it came from.</p>
+    {% if readings['claude-text'] %}<span class="badge RESOLVED">done</span>
+    {% elif has_pdf and claude_ok %}<form method="post" action="/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="which" value="claude-text"><input type="hidden" name="back" value="passes"><button type="submit">Run pass 3</button></form>
+      <span class="muted">about $0.003 to $0.004 a page, under a minute</span>
+    {% else %}<span class="muted">needs the PDF and a Claude API key</span>{% endif %}
+  </div>
+</div>
+
+{% if rows %}
+{% if blocked %}
+<div class="msg gate">Merge blocked: {{ blocked|length }} HIGH disagreement{{ "s" if blocked|length > 1 }} still open (gate: {{ gate }}).</div>
+{% else %}
+<div class="msg open">Merge allowed{% if n_open %} ({{ n_open }} LOW disagreement{{ "s" if n_open > 1 }} still open; pass 1's value is kept for those){% endif %}.</div>
+{% endif %}
+
+<p class="muted">Each review row pre-selects the answer most passes share (Claude on a tie). It is only a default: nothing is resolved until you submit, and the cited page is the record.</p>
+<div class="card">
+<table>
+  <tr><th>Field</th><th>Pass 1: pattern code</th><th>Pass 2: Jev</th><th>Pass 3: Claude</th><th>Status</th><th>Your decision</th></tr>
+  {% for r in rows %}
+  <tr class="{{ 'agree' if r.agree else '' }}">
+    <td><code>{{ r.id }}</code> <span class="badge {{ r.severity }}">{{ r.severity }}</span></td>
+    {% for name, text, ran in r.cells %}
+      <td>{% if not ran %}<span class="muted">not run</span>
+          {% elif text == "" %}<span class="muted">{{ "not applicable" if name == "jev" else "—" }}</span>
+          {% else %}{{ text }}{% endif %}
+          {% if name == "jev" and r.note %}<div class="muted">{{ r.note }}</div>{% endif %}</td>
+    {% endfor %}
+    <td>{% if r.agree %}<span class="badge RESOLVED">agree</span>{% else %}<span class="badge {{ r.status }}">{{ "review" if r.status == "OPEN" else "resolved" }}</span>{% endif %}</td>
+    <td>
+      {% if r.resolution %}<div class="muted">took {{ r.resolution.choice }} = {{ r.resolution.value }} · {{ r.resolution.reviewer }}</div>{% endif %}
+      {% if not r.agree %}
+      <form method="post" action="/r/{{ rid }}/passes/resolve" class="row-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="row_id" value="{{ r.id }}">
+        <select name="choice">{% for c in r.choices %}<option value="{{ c }}" {{ "selected" if c == r.suggest }}>take {{ labels[c].split(': ')[1] }}</option>{% endfor %}<option value="manual">type value</option></select>
+        <input type="text" name="value" placeholder='e.g. 9 or ["Security"]'>
+        <input type="text" name="reviewer" placeholder="your name" required>
+        <button class="small" type="submit">{{ "Change" if r.resolution else "Resolve" }}</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+<form method="post" action="/r/{{ rid }}/passes/merge"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <button type="submit">Merge the passes into one reading</button></form>
+{% else %}
+<p class="muted">Run at least one pass to see the comparison.</p>
+{% endif %}
+{% endblock %}

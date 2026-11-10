@@ -18,6 +18,9 @@
   .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin:12px 0; }
   .grid { display:grid; grid-template-columns: 3fr 2fr; gap:16px; }
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .card.pass p { margin: 6px 0 10px; }
+  tr.agree td { color: var(--muted); }
   table { width:100%; border-collapse:collapse; font-size:14px; }
   th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }

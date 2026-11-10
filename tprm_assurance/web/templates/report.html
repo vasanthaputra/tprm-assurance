@@ -22,10 +22,8 @@
   </p>
   {% endif %}
   {% if meta %}<p class="muted">Last Claude run: {{ meta.input_tokens }} in / {{ meta.output_tokens }} out tokens, about ${{ meta.estimated_cost_usd }}.</p>{% endif %}
-  {% if names|length >= 2 %}
-  <p><a href="/r/{{ rid }}/conflicts?a={{ names[0] }}&b={{ names[1] }}"><b>Compare readings →</b></a>
-     <span class="muted">where two readers disagree, a person decides before the merge</span></p>
-  {% endif %}
+  <p><a href="/r/{{ rid }}/passes"><b>3-pass review</b></a>
+     <span class="muted">pattern code, Jev and Claude read the same report; wherever they disagree, you decide</span></p>
 </div>
 
 {% if ex %}
