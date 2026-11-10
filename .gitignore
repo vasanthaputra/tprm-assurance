@@ -11,3 +11,6 @@ private/
 # Local web app data (uploaded reports, readings, decisions) and local tool config
 workspace/
 .claude/
+
+# Built Cloudflare Worker (generated from site/index.html)
+site/dist/

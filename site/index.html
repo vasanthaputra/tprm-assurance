@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tprm-assurance: can we rely on this vendor's SOC 2 report?</title>
+<meta name="description" content="A third-party risk tool that reads SOC 2 reports with rules and Claude, checks disagreements against the cited page, and keeps a person in charge of every decision. Measured on two real reports.">
+<style>
+  :root {
+    --paper: #F3F6F5; --sheet: #FFFFFF; --ink: #14243B; --soft: #4E5D6E; --rule: #D3DCD8;
+    --tick: #B8322A; --relied: #2E6A4E; --reliedbg: #E3EFE8; --tickbg: #F8E7E5; --hold: #8A5B0A; --holdbg: #FBF0D9;
+    --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--sans); }
+  a { color: var(--ink); text-decoration-color: var(--tick); text-underline-offset: 3px; }
+  a:hover { color: var(--tick); }
+  :focus-visible { outline: 3px solid var(--tick); outline-offset: 2px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; padding: 22px 0 0; font-size: 15px; color: var(--soft); }
+  .top b { color: var(--ink); font-family: var(--serif); font-size: 18px; font-weight: 700; }
+
+  /* Workpaper layout: text column plus a reference margin, as audit workpapers cite their evidence. */
+  .wp { display: grid; grid-template-columns: minmax(0, 1fr) 190px; column-gap: 40px; }
+  .wp > .ref { color: var(--soft); font-size: 14px; line-height: 1.5; padding-top: 6px; border-left: 2px solid var(--rule); padding-left: 14px; }
+  .ref b { color: var(--ink); font-weight: 600; }
+  @media (max-width: 820px) { .wp { grid-template-columns: 1fr; } .wp > .ref { border-left: 0; border-top: 2px solid var(--rule); padding: 10px 0 0; margin-top: 10px; } }
+
+  h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.15; letter-spacing: -0.005em; }
+  h1 { font-size: clamp(34px, 5.4vw, 58px); margin: 56px 0 18px; max-width: 16ch; }
+  h2 { font-size: 30px; margin: 0 0 14px; }
+  h3 { font-size: 20px; margin: 22px 0 6px; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  .lede { font-size: 20px; color: var(--soft); max-width: 60ch; }
+  section { padding: 56px 0; border-top: 1px solid var(--rule); }
+
+  /* The hero exhibit: one field, two readers, the page, and a person's tickmark. */
+  .exhibit { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; margin: 34px 0 8px; }
+  .exhibit .field { padding: 14px 20px; border-bottom: 1px solid var(--rule); font-size: 15px; color: var(--soft); }
+  .exhibit .field strong { color: var(--ink); font-family: var(--serif); font-size: 19px; display: block; }
+  .readers { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .reader { padding: 16px 20px; border-right: 1px solid var(--rule); }
+  .reader:last-child { border-right: 0; }
+  .reader .who { font-size: 14px; color: var(--soft); }
+  .reader .what { font-family: var(--serif); font-size: 21px; margin-top: 2px; }
+  .reader.wrong .what { text-decoration: line-through; text-decoration-color: var(--tick); text-decoration-thickness: 2px; }
+  .reader.page { background: #FAFCFB; }
+  .verdict { padding: 14px 20px; border-top: 1px solid var(--rule); display: flex; gap: 12px; align-items: flex-start; }
+  .tickmark { flex: none; width: 30px; height: 30px; }
+  .verdict p { margin: 0; font-size: 16px; }
+  @media (max-width: 720px) { .readers { grid-template-columns: 1fr; } .reader { border-right: 0; border-bottom: 1px solid var(--rule); } }
+
+  /* Results */
+  table { width: 100%; border-collapse: collapse; font-size: 15.5px; background: var(--sheet); border: 1px solid var(--rule); }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 600; color: var(--soft); font-size: 14px; background: #FAFCFB; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.lead td { font-weight: 600; }
+  .scroll { overflow-x: auto; }
+
+  ol.steps { margin: 6px 0 0; padding: 0; list-style: none; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 18px 46px; max-width: 70ch; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 30px; height: 30px; border: 2px solid var(--ink);
+    border-radius: 50%; font: 700 15px/26px var(--serif); text-align: center; }
+  ol.steps li b { font-family: var(--serif); font-size: 18px; }
+
+  /* Interactive sample review */
+  .demo { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; }
+  .tabs { display: flex; border-bottom: 1px solid var(--rule); }
+  .tabs button { flex: 1; font: 600 15px var(--sans); color: var(--soft); background: none; border: 0; padding: 14px 10px; cursor: pointer; border-bottom: 3px solid transparent; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+  .pane { padding: 18px 20px; }
+  .pane[hidden] { display: none; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); align-items: center; }
+  .row:last-child { border-bottom: 0; }
+  .row .t { font-weight: 600; } .row .d { color: var(--soft); font-size: 15px; }
+  .acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .btn { font: 600 14px var(--sans); padding: 7px 13px; border-radius: 4px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  .btn.alt { background: #fff; color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .state { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 3px; white-space: nowrap; }
+  .s-proposed, .s-open { background: var(--holdbg); color: var(--hold); }
+  .s-approved, .s-resolved { background: var(--reliedbg); color: var(--relied); }
+  .s-rejected { background: #ECEFEE; color: var(--soft); }
+  .gate { padding: 12px 14px; border-radius: 4px; margin: 0 0 12px; font-weight: 600; }
+  .gate.shut { background: var(--tickbg); color: var(--tick); } .gate.open { background: var(--reliedbg); color: var(--relied); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 15px; margin-top: 4px; }
+  .pair span { color: var(--soft); }
+  .sev { font-size: 12px; font-weight: 700; color: var(--tick); border: 1.5px solid var(--tick); border-radius: 3px; padding: 0 5px; margin-left: 6px; }
+  .note { color: var(--soft); font-size: 14px; margin-top: 10px; }
+  @media (max-width: 620px) { .row { grid-template-columns: 1fr; } .acts { justify-content: flex-start; } .pair { grid-template-columns: 1fr; } }
+
+  ul.plain { padding-left: 20px; max-width: 68ch; } ul.plain li { margin-bottom: 8px; }
+  footer { padding: 34px 0 60px; border-top: 1px solid var(--rule); color: var(--soft); font-size: 15px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .tick-draw { stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .7s .5s ease-out forwards; }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><b>tprm-assurance</b><a href="https://github.com/vasanthaputra/tprm-assurance">Source on GitHub</a></div>
+
+  <div class="wp">
+    <div>
+      <h1>Can we rely on this vendor's SOC 2 report?</h1>
+      <p class="lede">A third-party risk tool that reads the report twice, once with rules and once with Claude, checks every
+      disagreement against the page it came from, and leaves each decision to a person.</p>
+    </div>
+    <div class="ref"><b>What this page is</b><br>A summary of a working project, with a demo on a fictional report. Real reports are restricted-use documents and stay off the internet.</div>
+  </div>
+
+  <div class="wp">
+    <figure class="exhibit" style="margin-left:0;margin-right:0">
+      <div class="field"><strong>Which trust services categories does the examination cover?</strong>From a real report, anonymized.</div>
+      <div class="readers">
+        <div class="reader wrong"><div class="who">Rules extractor</div><div class="what">All five</div></div>
+        <div class="reader"><div class="who">Claude</div><div class="what">Security only</div></div>
+        <div class="reader page"><div class="who">The scope page</div><div class="what">Security only</div></div>
+      </div>
+      <div class="verdict">
+        <svg class="tickmark" viewBox="0 0 30 30" aria-hidden="true"><path class="tick-draw" d="M5 16 L12 23 L26 6" fill="none" stroke="#B8322A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p>The readers disagreed, so the merge stopped until a reviewer checked the page and chose. Had the rules reading
+        gone through, a reviewer relying on Availability would have been told it was covered.</p>
+      </div>
+    </figure>
+    <div class="ref"><b>Why it matters</b><br>The scope page named all five categories in the title of the criteria, then applied one. Pattern-matching took the title.</div>
+  </div>
+
+  <section>
+    <div class="wp">
+      <div>
+        <h2>Measured on two real reports</h2>
+        <p>Report A is the one the rules extractor was built from. Report B is a held-out report from a different audit
+        firm; nothing was tuned on it before the run. Each answer key has 27 checks, written from the page text before
+        any Claude run.</p>
+        <div class="scroll">
+        <table>
+          <tr><th>Reader</th><th>Report A</th><th>Report B</th><th>Factual errors</th><th>Findings on B, vs the answer key</th><th>Cost per report</th></tr>
+          <tr><td>Rules, no AI</td><td class="num">27 / 27</td><td class="num">10 / 27</td><td>many on B</td><td>1 finding, and it was wrong; all 13 real findings missed</td><td class="num">$0</td></tr>
+          <tr class="lead"><td>Claude, page text</td><td class="num">25 / 27</td><td class="num">26 / 27</td><td class="num">0</td><td>the same 13</td><td class="num">$0.18 / $0.36</td></tr>
+          <tr><td>Claude, PDF</td><td class="num">24 / 27</td><td class="num">25 / 27</td><td class="num">0</td><td>the same 13</td><td class="num">$0.51 / $1.19</td></tr>
+        </table>
+        </div>
+        <p class="note">Every Claude miss was a page citation or spelling where the cited page also states the value.</p>
+        <h3>What reading twice caught</h3>
+        <p>A bug in the rules extractor, which counted a legend sentence as a test result. And a mistake in the answer key
+        itself: it had no untested controls, while Claude found seven results reading "No testing performed". Untested
+        controls are not evidence that controls work. The key was corrected after the run, and the correction is recorded.</p>
+        <h3>The decision model that checks disagreements</h3>
+        <p>Jev, a decision model from TypeSafe, answers one yes-or-no question per disputed value: does this page support it?
+        It never sees counts or dates, which its own documentation says it handles poorly. In a test of 46 questions mixing
+        true values with deliberately planted wrong ones, it accepted no wrong value and rejected no true one; three answers
+        were unsure and went to a person.</p>
+      </div>
+      <div class="ref"><b>Model</b><br>claude-opus-5-5, structured JSON, one run per route.<br><br><b>Decision model</b><br>jev-1.14.0; yes at 0.8 or above, no at 0.2 or below, a person in between.<br><br><b>Limits</b><br>Two reports. Answer keys not yet checked by a second person.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wp">
+      <div>
+        <h2>How a review runs</h2>
+        <ol class="steps">
+          <li><b>Read the report twice.</b> The rules extractor and Claude each return the same fields, every value with the page it came from.</li>
+          <li><b>Compare the readings.</b> Any field where they disagree goes to a queue. A disagreement that changes a reliance rule blocks the merge.</li>
+          <li><b>Check the page.</b> Jev reads the cited page and suggests which reading it supports. The suggestion is advice; it resolves nothing.</li>
+          <li><b>A person resolves each disagreement</b> by taking one reading or typing the value from the page. Every resolution is logged and bound to the exact pair of readings.</li>
+          <li><b>Apply the reliance rules.</b> Period and staleness, bridge letters, scope against the categories you need, carved-out providers, owners for complementary user controls, test exceptions.</li>
+          <li><b>A person approves or rejects each finding.</b> Nothing is a finding until then. Decisions are appended to a log, never overwritten, and tied to a hash of the reading they were made on.</li>
+        </ol>
+      </div>
+      <div class="ref"><b>Sources</b><br>Each rule cites a published source: the 2023 interagency third-party risk guidance, GDPR Article 28, NIST SP 800-53, and a practitioner SOC 2 review method. Values a regulator leaves to you are marked as your policy.</div>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="wp">
+      <div>
+        <h2>Try the review on a fictional report</h2>
+        <p>Example Vendor's report and both readings below are invented. Approve or reject findings, then open the
+        disagreements and see the merge stay blocked until each one is resolved. Nothing you click leaves this page.</p>
+        <div class="demo">
+          <div class="tabs" role="tablist">
+            <button role="tab" id="t-f" aria-selected="true" aria-controls="p-f">Proposed findings</button>
+            <button role="tab" id="t-c" aria-selected="false" aria-controls="p-c">Disagreements</button>
+          </div>
+          <div class="pane" id="p-f" role="tabpanel" aria-labelledby="t-f"></div>
+          <div class="pane" id="p-c" role="tabpanel" aria-labelledby="t-c" hidden></div>
+        </div>
+      </div>
+      <div class="ref"><b>Your context</b><br>Needs Security and Availability. Holds no provider reports. No owners assigned for the vendor's complementary user controls.<br><br>Change the context in the real tool and the findings recalculate.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wp">
+      <div>
+        <h2>What it will not do</h2>
+        <ul class="plain">
+          <li>Decide on its own. Every finding and every disagreement waits for a named person.</li>
+          <li>Pick a winner when readers disagree. It stops and shows both, with the page.</li>
+          <li>Trust a measurement it has not made. Claude and Jev are scored against answer keys before anyone relies on them.</li>
+          <li>Put real reports online. The tool runs on the reviewer's machine, and real reports, answer keys and results stay there.</li>
+        </ul>
+      </div>
+      <div class="ref"><b>This page</b><br>Loads nothing from third parties: no fonts, no analytics, no scripts from elsewhere.</div>
+    </div>
+  </section>
+
+  <footer>
+    tprm-assurance is open source: <a href="https://github.com/vasanthaputra/tprm-assurance">github.com/vasanthaputra/tprm-assurance</a>.
+    The demo data is fictional; the measured results are anonymized aggregates.
+  </footer>
+</div>
+
+<script>
+(() => {
+  const findings = [
+    ["PERIOD_SHORT", "Type 2 period shorter than 6 months", "1 Jan to 30 Jun 2025, 5 months", 1],
+    ["REPORT_STALE", "Period ended over 15 months ago; ask for the successor report", "ended 30 Jun 2025", 1],
+    ["CATEGORY_WORDING_MIXED", "Scope names more categories in one place than another", "in scope: Security, Availability; also named: Confidentiality", 5],
+    ["CARVE_OUT_NO_ASSURANCE", "Carved-out provider with no assurance report on file", "Nimbus Cloud (NC)", 5],
+    ["CARVE_OUT_NO_ASSURANCE", "Carved-out provider with no assurance report on file", "Gitworks Inc", 5],
+    ["CARVE_OUT_NO_ASSURANCE", "Carved-out provider with no assurance report on file", "Ledgerly", 5],
+    ["CUEC_UNOWNED", "Complementary user entity controls with no internal owner", "9 controls, 0 owned", 28],
+    ["EXCEPTIONS_PRESENT", "Test results other than 'No exceptions noted'; triage each", "1 deviation, 118 clean", 33],
+  ].map(([rule, meaning, detail, page]) => ({ rule, meaning, detail, page, state: "proposed" }));
+  const conflicts = [
+    { field: "Categories in scope", a: "Security, Availability", b: "Security", page: 5 },
+    { field: "Categories also named", a: "Confidentiality", b: "Availability, Confidentiality", page: 5 },
+    { field: "CUEC count", a: "9", b: "8", page: 28 },
+    { field: "Subservice providers", a: "Nimbus Cloud (NC), Gitworks Inc, Ledgerly", b: "Nimbus cloud(NC), Gitworks Inc, Ledgerly", page: 5 },
+  ].map(c => ({ ...c, state: "open", took: "" }));
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const pf = document.getElementById("p-f"), pc = document.getElementById("p-c");
+
+  function drawFindings() {
+    pf.replaceChildren();
+    findings.forEach(f => {
+      const row = el("div", "row"), left = el("div");
+      left.append(el("div", "t", f.meaning), el("div", "d", `${f.detail} · page ${f.page}`));
+      const acts = el("div", "acts");
+      acts.append(el("span", `state s-${f.state}`, f.state === "proposed" ? "Proposed" : f.state === "approved" ? "Approved" : "Rejected"));
+      if (f.state === "proposed") {
+        const ok = el("button", "btn", "Approve"), no = el("button", "btn alt", "Reject");
+        ok.onclick = () => { f.state = "approved"; drawFindings(); };
+        no.onclick = () => { f.state = "rejected"; drawFindings(); };
+        acts.append(ok, no);
+      }
+      row.append(left, acts); pf.append(row);
+    });
+    const done = findings.filter(f => f.state !== "proposed").length;
+    pf.append(el("p", "note", `${done} of ${findings.length} decided. In the tool, each decision is logged with the reviewer's name and bound to this reading.`));
+  }
+
+  function drawConflicts() {
+    pc.replaceChildren();
+    const open = conflicts.filter(c => c.state === "open").length;
+    pc.append(el("div", `gate ${open ? "shut" : "open"}`, open ? `Merge blocked: ${open} disagreement${open > 1 ? "s" : ""} that change a reliance rule still open.` : "Merge allowed: every disagreement has a reviewer's decision."));
+    conflicts.forEach(c => {
+      const row = el("div", "row"), left = el("div");
+      const t = el("div", "t", c.field); t.append(el("span", "sev", "changes a rule"));
+      const pair = el("div", "pair");
+      pair.append(el("div", null, ""), el("div", null, ""));
+      pair.children[0].append(el("span", null, "Rules: "), document.createTextNode(c.a));
+      pair.children[1].append(el("span", null, "Claude: "), document.createTextNode(c.b));
+      left.append(t, pair, el("div", "d", `Check page ${c.page}`));
+      const acts = el("div", "acts");
+      acts.append(el("span", `state s-${c.state}`, c.state === "open" ? "Open" : `Resolved: ${c.took}`));
+      if (c.state === "open") {
+        const ta = el("button", "btn alt", "Take rules"), tb = el("button", "btn alt", "Take Claude");
+        ta.onclick = () => { c.state = "resolved"; c.took = "rules"; drawConflicts(); };
+        tb.onclick = () => { c.state = "resolved"; c.took = "Claude"; drawConflicts(); };
+        acts.append(ta, tb);
+      }
+      row.append(left, acts); pc.append(row);
+    });
+    const merge = el("button", "btn", "Merge into one reading");
+    merge.disabled = open > 0;
+    merge.onclick = () => { merge.replaceWith(el("p", "note", "Merged. The new reading has its own hash, so findings are decided on it afresh.")); };
+    const foot = el("div"); foot.style.marginTop = "14px"; foot.append(merge); pc.append(foot);
+  }
+
+  const tf = document.getElementById("t-f"), tc = document.getElementById("t-c");
+  function show(which) {
+    const f = which === "f";
+    tf.setAttribute("aria-selected", f); tc.setAttribute("aria-selected", !f);
+    pf.hidden = !f; pc.hidden = f;
+  }
+  tf.onclick = () => show("f"); tc.onclick = () => show("c");
+  drawFindings(); drawConflicts();
+})();
+</script>
+</body>
+</html>
