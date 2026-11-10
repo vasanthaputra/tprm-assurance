@@ -16,10 +16,12 @@ class Check:
     key: str
     expected: object
     got: object
+    missing: bool = False   # the extraction has no such field at all
 
     @property
     def ok(self) -> bool:
-        return self.expected == self.got
+        # A missing field is wrong even where the answer is "none": silence is not an answer.
+        return not self.missing and self.expected == self.got
 
 
 def _norm(v):
@@ -31,9 +33,11 @@ def score(extraction: dict, truth: dict) -> list[Check]:
     for field, expected in truth.items():
         if field.startswith("_"):
             continue
-        got = extraction.get(field) or {}
+        got = extraction.get(field)
+        missing = not isinstance(got, dict)
+        got = got if not missing else {}
         for key, val in expected.items():
-            checks.append(Check(field, key, _norm(val), _norm(got.get(key))))
+            checks.append(Check(field, key, _norm(val), _norm(got.get(key)), missing or key not in got))
     return checks
 
 

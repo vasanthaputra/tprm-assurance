@@ -1,8 +1,8 @@
 """Rules-based SOC 2 report extractor: module 3 of tprm-assurance.
 
 Reads a SOC 2 PDF page by page (pypdf) and pulls out the facts a reviewer needs, each
-with the page it came from. No AI. The patterns follow the report anatomy in
-docs/soc2_report_anatomy.md (S3, S5). Where a field cannot be found, it is reported as
+with the page it came from. No AI. The patterns follow the report anatomy of
+S3 and S5 (see SOURCES.md). Where a field cannot be found, it is reported as
 UNKNOWN rather than guessed, so the reviewer looks at it.
 """
 from __future__ import annotations
@@ -176,14 +176,16 @@ def extract(pages: list[str], source_name: str = "") -> dict:
             break
 
     # Test results: count clean results vs anything else that says "exception(s) noted".
-    # A quoted phrase is the report explaining its legend ('noted by the phrase "No exceptions
-    # noted"'), not a result, so short quoted spans are removed first. Found 2026-11-10 when
-    # the rules extractor counted 144 on S5 and Claude counted 143; page text shows 143.
+    # The legend sentence 'noted by the phrase "No exceptions noted"' explains the convention and
+    # is not a result (S5 counted 144 instead of 143 before this). Only that exact phrase in double
+    # quotes is removed. Any other quoted or apostrophe-adjacent wording still counts, so a doubt
+    # becomes a finding for the reviewer instead of a silent miss (fail closed; security review
+    # 2026-11-10 found the earlier "strip any quoted span" version could hide a real exception).
     tr = _find_page(pages, r"Test Results")
     clean = other = 0
     if tr is not None:
         for text in pages[tr:]:
-            text = re.sub(r"[“\"‘'][^“”\"‘’']{1,60}[”\"’']", " ", text)
+            text = re.sub(r"[“\"]\s*No exceptions noted\.?\s*[”\"]", " ", text, flags=re.I)
             clean += len(re.findall(r"No exceptions noted", text, re.I))
             other += len(re.findall(r"(?<!No )exceptions? noted", text, re.I))
     out["test_results"] = {"no_exceptions_noted": clean, "exceptions_noted": other, "from_page": (tr + 1) if tr is not None else None}

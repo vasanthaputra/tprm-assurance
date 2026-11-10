@@ -1,7 +1,7 @@
 """Conflict queue checks: two extractions of the same report are compared field by field,
 every disagreement waits for a person, and the merge gate cannot be switched off.
 
-Extraction B below is SYNTHETIC: a copy of the verified rules fixture with planted
+Extraction A is the SYNTHETIC sample extraction; B is a copy of it with planted
 differences shaped like a copy-paste AI reply (missing keys the AI schema lacks, different
 wording in the opinion basis, different capitalisation, one wrong count, one wrong page)."""
 import json
@@ -25,14 +25,14 @@ from tprm_assurance.soc2.conflicts import (
 from tprm_assurance.soc2.reliance import load_context, propose, report_hash
 
 ROOT = Path(__file__).resolve().parent.parent
-FIX = ROOT / "data" / "fixtures"
+FIX = ROOT / "data" / "sample"
 HIGH_GATE = {"conflicts": {"gate_severity": "HIGH"}}
 LOW_GATE = {"conflicts": {"gate_severity": "LOW"}}
 
 
 @pytest.fixture
 def a():
-    return json.loads((FIX / "s5_report_a_rules_extraction.json").read_text(encoding="utf-8"))
+    return json.loads((FIX / "sample_soc2_extraction.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def b(a):
     ex["auditor"].pop("firm_page", None)
     ex["opinion"]["basis"] = "The auditor's opinion has no qualification."       # wording only
     ex["subservice_orgs"]["values"][0] = ex["subservice_orgs"]["values"][0].upper()  # case only
-    ex["cuecs"]["count"] = 11                                                    # wrong: HIGH
+    ex["cuecs"]["count"] = 8                                                     # wrong: HIGH
     ex["report_date"]["page"] = 10                                               # wrong page: LOW
     ex["test_results"]["no_exceptions_noted"] += 3                               # not rule-driving: LOW
     return ex
@@ -90,9 +90,9 @@ def test_merge_blocks_on_open_high_conflict_only_at_high_gate(a, b, tmp_path):
         merge(a, b, log, HIGH_GATE)
     assert [c.id for c in e.value.conflicts] == ["cuecs.count"]
 
-    resolve(log, a, b, "cuecs.count", "a", "reviewer-a", note="12 bullets on page 30")
+    resolve(log, a, b, "cuecs.count", "a", "reviewer-a", note="9 bullets on page 28")
     merged = merge(a, b, log, HIGH_GATE)                       # LOW ones still open: allowed
-    assert merged["cuecs"]["count"] == 12
+    assert merged["cuecs"]["count"] == 9
     assert sorted(merged["_merge"]["open"]) == ["report_date.page", "test_results.no_exceptions_noted"]
 
     with pytest.raises(GateBlocked) as e:                       # LOW gate blocks on every open one
@@ -136,7 +136,7 @@ def test_resolution_does_not_leak_to_a_different_pair(a, b, tmp_path):
     log = tmp_path / "conflicts.jsonl"
     resolve(log, a, b, "cuecs.count", "a", "reviewer-a")
     b2 = json.loads(json.dumps(b))
-    b2["cuecs"]["count"] = 10
+    b2["cuecs"]["count"] = 7
     c = by_id(apply_resolutions(find_conflicts(a, b2), log))["cuecs.count"]
     assert c.status == "OPEN"
     with pytest.raises(GateBlocked):

@@ -5,7 +5,7 @@
   python -m tprm_assurance.cli soc2 extract <report.pdf> --out extraction.json [--extractor rules|anthropic]
   python -m tprm_assurance.cli soc2 prompt  <report.pdf> --out prompt.txt       (copy-paste path, no API key)
   python -m tprm_assurance.cli soc2 review  <extraction.json> --context ctx.yaml [--decisions log.jsonl] [--out F]
-  python -m tprm_assurance.cli soc2 score   <extraction.json> [--truth ground_truth.json] [--out F]
+  python -m tprm_assurance.cli soc2 score   <extraction.json> --truth answer_key.json [--out F]
   python -m tprm_assurance.cli demo [--out-dir out]
   python -m tprm_assurance.cli soc2 decide  <extraction.json> <finding_id> approve|reject --reviewer NAME [--note ...] [--decisions log.jsonl]
   python -m tprm_assurance.cli soc2 conflicts <a.json> <b.json> [--resolutions log.jsonl] [--out F]   (two extractions of one report)
@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     soc = sub.add_parser("soc2", help="SOC 2 reliance review").add_subparsers(dest="soc2_cmd", required=True)
     sc = soc.add_parser("score", help="score an extraction against hand-verified ground truth (module 4)")
     sc.add_argument("extraction_json", type=Path)
-    sc.add_argument("--truth", type=Path, default=ROOT / "data" / "fixtures" / "s5_report_a_ground_truth.json")
+    sc.add_argument("--truth", type=Path, required=True, help="answer key for this report (data/sample/sample_soc2_truth.json for the sample)")
     sc.add_argument("--out", type=Path)
     ex = soc.add_parser("extract")
     ex.add_argument("pdf", type=Path)
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         (d / "register_review.md").write_text(to_markdown(register, f1, policy), encoding="utf-8")
         rows, f2, policy = run_acceptances(s / "risk_acceptances.csv", pol)
         (d / "acceptance_review.md").write_text(acceptances_to_markdown(rows, f2, policy), encoding="utf-8")
-        ex_data = json.loads((ROOT / "data" / "fixtures" / "s5_report_a_rules_extraction.json").read_text(encoding="utf-8"))
+        ex_data = json.loads((ROOT / "data" / "sample" / "sample_soc2_extraction.json").read_text(encoding="utf-8"))
         ctx = load_context(s / "soc2_context.yaml")
         f3 = apply_decisions(propose(ex_data, ctx, load_policy(pol)), d / "decisions.jsonl")
         (d / "soc2_review.md").write_text(soc2_md(ex_data, f3, ctx), encoding="utf-8")

@@ -13,7 +13,7 @@ from tprm_assurance.soc2.conflicts import Conflict, find_conflicts, to_markdown
 from tprm_assurance.soc2.jev_check import JEV_MODEL, check, load_suggestions, plan
 
 ROOT = Path(__file__).resolve().parent.parent
-FIX = ROOT / "data" / "fixtures"
+FIX = ROOT / "data" / "sample"
 POLICY = {"conflicts": {"jev_yes": 0.8, "jev_no": 0.2}}
 PAGES = ["title page: SOC 2 TYPE 2 REPORT", "p2", "p3", "p4", "p5",
          "scope page text", "p7", "Opinion In our opinion ... Restricted Use"]
@@ -104,20 +104,20 @@ def test_list_field_can_suggest_a_value_neither_extractor_had():
 
 def test_wording_only_differences_in_names_are_matched_without_asking():
     in_a = ["Nimbus cloud(NC)", "MongoDB"]
-    in_b = ["Amazon Web Services (AWS)", "MongoDB", "Twilio"]
+    in_b = ["Nimbus Cloud (NC)", "MongoDB", "Twilio"]
     a, b = ex(subservice_orgs={"values": in_a, "page": 6}), ex(subservice_orgs={"values": in_b, "page": 6})
     c = conflict("subservice_orgs", "values", in_a, in_b)
     client = FakeClient({"Twilio": 0.02})
     s = check([c], a, b, PAGES, client, POLICY)[0]
     asked = json.dumps(client.calls[0]["questions"], default=lambda o: getattr(o, "__dict__", str(o)))
-    assert "Twilio" in asked and "Amazon" not in asked
+    assert "Twilio" in asked and "Nimbus" not in asked
     assert s.choice == "a" and s.value == in_a
 
 
 def test_spelling_only_list_difference_is_settled_in_code():
-    """Seen on the real Report A run: Claude wrote 'Amazon Web Services (AWS)', rules 'Nimbus cloud(NC)'."""
+    """Seen on a real run: Claude fixed a provider name's spacing and capitals; the rules kept the PDF's."""
     in_a = ["Nimbus cloud(NC)", "Gitworks(Gitworks Inc)", "MongoDB"]
-    in_b = ["Amazon Web Services (AWS)", "GitHub (GitHub Inc)", "MongoDB"]
+    in_b = ["Nimbus Cloud (NC)", "GitWorks (GitWorks Inc)", "MongoDB"]
     a, b = ex(subservice_orgs={"values": in_a, "page": 6}), ex(subservice_orgs={"values": in_b, "page": 6})
     client = FakeClient()
     s = check([conflict("subservice_orgs", "values", in_a, in_b)], a, b, PAGES, client, POLICY)[0]
@@ -150,10 +150,10 @@ def test_record_keeps_the_exact_payload_and_answers(tmp_path):
 
 
 def test_queue_shows_suggestion_only_for_the_same_pair(tmp_path):
-    fa = json.loads((FIX / "s5_report_a_rules_extraction.json").read_text(encoding="utf-8"))
+    fa = json.loads((FIX / "sample_soc2_extraction.json").read_text(encoding="utf-8"))
     fb = json.loads(json.dumps(fa)); fb["extractor"] = "manual"; fb["opinion"]["value"] = "QUALIFIED"
     cs = find_conflicts(fa, fb)
-    pages = ["x"] * 52
+    pages = ["x"] * 60
     sug = check(cs, fa, fb, pages, FakeClient({"without": 0.95, "contain a": 0.04}), POLICY)
     path = tmp_path / "suggestions.json"
     path.write_text(json.dumps([s.to_record() for s in sug]), encoding="utf-8")

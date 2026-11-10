@@ -1,5 +1,5 @@
-"""Module 3 checks: the rules extractor matches the hand-verified ground truth on the one
-public report; the reliance rules propose the expected findings; the human gate works."""
+"""Module 3 checks on a SYNTHETIC extraction (data/sample), plus two checks on a real report that run
+only where the local, git-ignored private/ folder exists: the real reports are restricted use."""
 import json
 from datetime import date
 from pathlib import Path
@@ -12,21 +12,22 @@ from tprm_assurance.soc2.reliance import load_context, propose
 from tprm_assurance.soc2.review import apply_decisions, decide, load_decisions
 
 ROOT = Path(__file__).resolve().parent.parent
-FIX = ROOT / "data" / "fixtures"
+SAMPLE = ROOT / "data" / "sample"
+PRIVATE = ROOT / "private" / "fixtures"
+needs_private = pytest.mark.skipif(not (PRIVATE / "report_a_rules_extraction.json").exists(),
+                                   reason="real-report data is local only (private/, git-ignored)")
 
 
 @pytest.fixture
 def fixture():
-    return json.loads((FIX / "s5_report_a_rules_extraction.json").read_text(encoding="utf-8"))
+    return json.loads((SAMPLE / "sample_soc2_extraction.json").read_text(encoding="utf-8"))
 
 
-@pytest.fixture
-def truth():
-    return json.loads((FIX / "s5_report_a_ground_truth.json").read_text(encoding="utf-8"))
-
-
-def test_rules_extraction_matches_ground_truth(fixture, truth):
-    """Every ground-truth field (value and page) must be reproduced by the rules extractor."""
+@needs_private
+def test_rules_extraction_matches_ground_truth():
+    """Real report A: every answer-key field (value and page) is reproduced by the rules extractor."""
+    fixture = json.loads((PRIVATE / "report_a_rules_extraction.json").read_text(encoding="utf-8"))
+    truth = json.loads((PRIVATE / "report_a_ground_truth.json").read_text(encoding="utf-8"))
     misses = []
     for field, expected in truth.items():
         if field.startswith("_"):
@@ -41,22 +42,32 @@ def test_rules_extraction_matches_ground_truth(fixture, truth):
     assert not misses, "\n".join(misses)
 
 
-def test_reliance_findings_on_public_report(fixture):
+def test_reliance_findings_on_sample_report(fixture):
     ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
     ctx["as_of"] = date(2026, 10, 29)
     rules = sorted(f.rule for f in propose(fixture, ctx, load_policy(ROOT / "policy.yaml")))
+    assert rules == sorted(["PERIOD_SHORT", "BRIDGE_LETTER_NEEDED", "CATEGORY_WORDING_MIXED", "CUEC_UNOWNED",
+                            "EXCEPTIONS_PRESENT"] + ["CARVE_OUT_NO_ASSURANCE"] * 3)
+
+
+@needs_private
+def test_reliance_findings_on_real_report_a():
+    ex = json.loads((PRIVATE / "report_a_rules_extraction.json").read_text(encoding="utf-8"))
+    ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
+    ctx["as_of"] = date(2026, 10, 29)
+    rules = sorted(f.rule for f in propose(ex, ctx, load_policy(ROOT / "policy.yaml")))
     assert rules == sorted(["PERIOD_SHORT", "REPORT_STALE", "CATEGORY_WORDING_MIXED", "CUEC_UNOWNED"]
                            + ["CARVE_OUT_NO_ASSURANCE"] * 5)
 
 
 def test_context_changes_the_outcome(fixture):
     ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
-    ctx["as_of"] = date(2024, 6, 15)                      # 1 month after period end
-    ctx["subservice_reports_on_file"] = ["AWS", "Github", "MongoDB", "MySQL", "Google"]
-    ctx["cuec_owners"] = {i: "it-access" for i in range(1, 13)}
+    ctx["as_of"] = date(2025, 7, 15)                      # weeks after period end
+    ctx["subservice_reports_on_file"] = ["Nimbus", "Gitworks", "Ledgerly"]
+    ctx["cuec_owners"] = {i: "it-access" for i in range(1, 10)}
     ctx["categories_needed"] = ["Security", "Privacy"]   # Privacy is NOT in scope
     rules = sorted(f.rule for f in propose(fixture, ctx))
-    assert rules == ["CATEGORY_NOT_IN_SCOPE", "CATEGORY_WORDING_MIXED", "PERIOD_SHORT"]
+    assert rules == ["CATEGORY_NOT_IN_SCOPE", "CATEGORY_WORDING_MIXED", "EXCEPTIONS_PRESENT", "PERIOD_SHORT"]
 
 
 def test_human_gate_is_append_only(fixture, tmp_path):
@@ -110,8 +121,8 @@ def test_colliding_provider_names_get_distinct_ids(fixture):
 def test_carve_out_ids_name_the_provider(fixture):
     ctx = load_context(ROOT / "data" / "sample" / "soc2_context.yaml")
     ids = [f.id for f in propose(fixture, ctx) if f.rule == "CARVE_OUT_NO_ASSURANCE"]
-    assert any(i.endswith(":amazon-web-services-aws") for i in ids)
-    assert len(set(ids)) == 5
+    assert any(i.endswith(":nimbus-cloud-nc") for i in ids)
+    assert len(set(ids)) == 3
 
 
 # Code-path checks on tiny synthetic page strings (not a real report).
@@ -128,14 +139,24 @@ def test_extract_type1_as_of_and_qualified_opinion():
 
 
 def test_quoted_legend_phrase_is_not_counted_as_a_result():
-    """Found 2026-11-10 by the rules-vs-Claude conflict queue on S5: page 34 explains that clean
-    results are 'noted by the phrase “No exceptions noted”'. That sentence is not a result."""
+    """Found 2026-11-10 by the rules-vs-Claude conflict queue on a real report: a legend sentence that
+    quotes the phrase is not a result. (Wording below is invented, not copied from that report.)"""
     pages = ["Test Results In this matrix, a clean result is marked with the phrase "
-             "“No exceptions noted” in the last column. Any phrase other than the above, "
-             "\"exceptions noted\", indicates a deviation.",
+             "“No exceptions noted” in the last column.",
              "CC1.1 ... No exceptions noted. CC1.2 ... No exceptions noted. CC1.3 ... Exceptions noted: 1 of 25."]
     tr = extract(pages)["test_results"]
     assert tr["no_exceptions_noted"] == 2 and tr["exceptions_noted"] == 1
+
+
+def test_apostrophes_and_other_quoted_text_never_hide_an_exception():
+    """Security review 2026-11-10: stripping any short quoted span (apostrophes included) could delete a
+    real deviation and make EXCEPTIONS_PRESENT fail open. Only the legend phrase is removed; anything
+    else counts, so doubt goes to the reviewer (fail closed)."""
+    pages = ["Test Results",
+             "CC6.2 Management's response: exceptions noted in the user's access review. "
+             "CC6.3 Result: \"Exception noted\" for 2 of 25 samples. CC6.4 No exceptions noted."]
+    tr = extract(pages)["test_results"]
+    assert tr["exceptions_noted"] == 2 and tr["no_exceptions_noted"] == 1
 
 
 def test_qualified_outside_opinion_section_is_ignored():

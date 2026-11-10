@@ -1,0 +1,14 @@
+{
+  "_about": "SYNTHETIC answer key for the fictional report in sample_soc2_extraction.json, used to test the scorer. The real answer keys are kept locally because the reports they describe are restricted use.",
+  "report_type": {"value": "SOC2_TYPE2", "page": 1},
+  "period": {"start": "2025-01-01", "end": "2025-06-30", "page": 1},
+  "next_report_due": {"value": "2026-07-01", "page": 1},
+  "report_date": {"value": "2025-07-21", "page": 9},
+  "opinion": {"value": "UNQUALIFIED", "page": 7},
+  "categories": {"in_scope": ["Security", "Availability"], "also_mentioned": ["Confidentiality"], "page": 5},
+  "subservice_orgs": {"values": ["Nimbus Cloud (NC)", "Gitworks Inc", "Ledgerly"], "method": "carve-out", "page": 5},
+  "cuecs": {"count": 9, "page": 28},
+  "csoc_criteria": {"values": ["CC6.1", "CC6.4", "CC7.2"], "page": 29},
+  "auditor": {"signer": null, "firm": "Example Assurance LLP", "page": 9},
+  "test_results": {"no_exceptions_noted": 118, "exceptions_noted": 1, "from_page": 33}
+}

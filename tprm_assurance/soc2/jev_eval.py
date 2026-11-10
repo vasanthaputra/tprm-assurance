@@ -2,7 +2,7 @@
 wrong ones, on the real report pages, with the production question wording?
 
 Cases come from the answer keys (true) plus planted values (false, SYNTHETIC and labelled
-in data/fixtures/jev_planted_cases.json). One request per report and field, the cited page
+in a cases file kept locally with the answer keys). One request per report and field, the cited page
 as state, exactly as `soc2 jev-check` sends it. Failed calls raise: an eval must not turn
 an error into an answer.
 """

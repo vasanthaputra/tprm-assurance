@@ -8,8 +8,8 @@ from tprm_assurance.soc2.jev_eval import build_cases, run, score
 TRUTH = {"report_type": {"value": "SOC2_TYPE2", "page": 1},
          "opinion": {"value": "UNQUALIFIED", "page": 2},
          "categories": {"in_scope": ["Security"], "page": 3},
-         "subservice_orgs": {"values": ["Amazon Web Services (AWS)"], "page": 3}}
-PAGES = ["SOC 2 Type 2", "Opinion In our opinion ...", "scope: Security. Uses Amazon Web Services (AWS)."]
+         "subservice_orgs": {"values": ["Nimbus Cloud (NC)"], "page": 3}}
+PAGES = ["SOC 2 Type 2", "Opinion In our opinion ...", "scope: Security. Uses Nimbus Cloud (NC)."]
 SPEC = {"name": "r", "subservice_decoys": ["Twilio"], "hard": {"categories.in_scope": ["Privacy"]}}
 
 
@@ -26,7 +26,7 @@ def test_cases_cover_true_and_planted_values():
 
 
 def test_a_decoy_that_is_on_the_page_is_refused():
-    spec = dict(SPEC, subservice_decoys=["Amazon Web Services"])
+    spec = dict(SPEC, subservice_decoys=["Nimbus Cloud"])
     with pytest.raises(ValueError):
         build_cases(spec, TRUTH, PAGES)
 

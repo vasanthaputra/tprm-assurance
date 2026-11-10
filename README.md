@@ -10,8 +10,8 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 |---|---|---|
 | 1. Register check | Inventory completeness against accounts payable; reassessment by tier; DPA for personal data; report type, staleness, bridge letters | **Done**: 10 tests |
 | 2. Risk acceptance | Approver by delegated authority; owner; time-boxed expiry; max duration by rating; aging KRI | **Done**: 8 tests |
-| 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log, each decision bound to a hash of the extraction so it can't leak onto another report) | **Done**: 6 tests, verified against a real public report |
-| 4. Evaluation | `soc2 score` compares any extraction to hand-read ground truth, field by field | **Measured on 2 public reports** ([results](data/runs/2026-11-10/RESULTS.md)): on the report it was not built from, the rules extractor scored 10/27 and missed every real reliance finding; Claude scored 25-26/27 with **0 factual errors** on both reports and produced the same 13 findings as the answer key, at $0.18-0.36 per report (page-text route) |
+| 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log, each decision bound to a hash of the extraction so it can't leak onto another report) | **Done**: verified against a real report (kept local; restricted use) |
+| 4. Evaluation | `soc2 score` compares any extraction to hand-read ground truth, field by field | **Measured on 2 real reports** ([results](docs/results_2026-11-10.md)): on the report it was not built from, the rules extractor scored 10/27 and missed every real reliance finding; Claude scored 25-26/27 with **0 factual errors** on both reports and produced the same 13 findings as the answer key, at $0.18-0.36 per report (page-text route) |
 | 5. Conflict queue | When two extractions of one report disagree (rules vs AI), each disagreement is listed for a person to resolve: take A, take B, or type the value from the report. Append-only log bound to a hash of the pair. `soc2 merge` is refused while a disagreement that decides a reliance rule is open; the gate in `policy.yaml` has no "off" setting | **Done**: 14 tests on synthetic disagreements; not yet run on a real AI reply |
 
 ## Run it
@@ -58,7 +58,7 @@ python -m tprm_assurance.cli soc2 jev-check rules.json ai.json --pdf vendor_repo
 python -m tprm_assurance.cli soc2 conflicts rules.json ai.json --suggestions suggestions.json
 ```
 
-Status: measured 2026-11-10 ([results](data/runs/2026-11-10/RESULTS.md)). Planted-error test, 46 questions on 2 real reports: **0 planted wrong values accepted, 0 true values rejected**; 43 settled, 3 sent to a person (two of them the self-contradicting scope page marked hard before the run). On real rules-vs-Claude disagreements: 11 of 12 settled correctly, 1 to a person, 0 wrong.
+Status: measured 2026-11-10 ([results](docs/results_2026-11-10.md)). Planted-error test, 46 questions on 2 real reports: **0 planted wrong values accepted, 0 true values rejected**; 43 settled, 3 sent to a person (two of them the self-contradicting scope page marked hard before the run). On real rules-vs-Claude disagreements: 11 of 12 settled correctly, 1 to a person, 0 wrong.
 
 **HIGH** = the field decides whether a reliance rule fires (report type, period, opinion, categories, subservice organisations, CUEC count, exceptions). **LOW** = a page citation or detail text; a test checks that changing any LOW field changes no rule outcome. Differences in capitalisation, spacing or list order are not conflicts; one extractor saying "not found" while the other found a value is. Resolve every conflict before approving findings: the merged file is a new extraction with its own hash, so findings decided on it do not carry over if it is merged again. The reviewer's context file (what services you use, which categories you need, which subservice reports and CUEC owners you already have) changes the outcome, and it is your input, not a fact about the vendor.
 
@@ -68,7 +68,6 @@ Output: [`data/sample/sample_report.md`](data/sample/sample_report.md), an expos
 
 Every rule cites a source in [`SOURCES.md`](SOURCES.md): the 2023 Fed/FDIC/OCC interagency third-party guidance, GDPR Art. 28, and an MIT-licensed practitioner SOC 2 review method. Where a source deliberately leaves a value to the organisation (for example, how often to reassess a medium-risk vendor), [`policy.yaml`](policy.yaml) marks it **ORG POLICY** so you can change it.
 
-[`docs/soc2_report_anatomy.md`](docs/soc2_report_anatomy.md) walks through the structure of a real, vendor-published SOC 2 Type 2 report and what a reviewer checks in each section.
 
 ## Related work
 

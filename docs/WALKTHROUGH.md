@@ -12,9 +12,9 @@
 **Three things to say out loud.**
 
 - *"Every rule cites its source."* The 2023 interagency third-party guidance, GDPR Art. 28, NIST SP 800-53, and a practitioner SOC 2 review method. Where the regulators leave a number to the organisation (how often to reassess a medium vendor), it's marked ORG POLICY in one YAML file.
-- *"The AI is optional and measured."* The default extractor is pattern-based and traceable. The AI path drops in with the same JSON shape, and module 4 scores it against ground truth before anyone trusts it. On the one public report tested, the rules extractor scores 100% of fields.
+- *"The AI is optional and measured."* The default extractor is pattern-based and traceable. The AI path drops in with the same JSON shape, and module 4 scores it against ground truth before anyone trusts it. Measured on two real reports (kept local; restricted use): the rules extractor scored 27/27 on the report it was built from and 10/27 on a held-out one, where Claude made no factual errors (`docs/results_2026-11-10.md`).
 - *"The human gate is the product."* Proposed findings become findings only through a reviewer's decision, logged append-only with who, when, why, and what exactly was reviewed.
 
-**Honest limits.** Verified on one public SOC 2 report; other auditors' wording will produce UNKNOWN fields, which route the reviewer to the page rather than guessing. The API extractor is written but not yet run. Sample data is synthetic.
+**Honest limits.** Two real reports, one run per route; the answer keys were read from the page text and are not yet checked by a person. The reports, keys and per-field outputs stay local because SOC 2 reports are restricted use. Sample data is synthetic.
 
 **Demo in one command:** `py -3 -m tprm_assurance.cli demo` writes all three reports to `out/`.

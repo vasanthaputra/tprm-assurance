@@ -5,7 +5,7 @@ from pathlib import Path
 from tprm_assurance.soc2.evaluate import score, summary
 
 ROOT = Path(__file__).resolve().parent.parent
-FIX = ROOT / "data" / "fixtures"
+FIX = ROOT / "data" / "sample"   # SYNTHETIC extraction and answer key
 
 
 def load(name):
@@ -13,21 +13,21 @@ def load(name):
 
 
 def test_rules_fixture_scores_full_marks():
-    ok, total = summary(score(load("s5_report_a_rules_extraction.json"), load("s5_report_a_ground_truth.json")))
-    assert ok == total and total >= 25
+    ok, total = summary(score(load("sample_soc2_extraction.json"), load("sample_soc2_truth.json")))
+    assert ok == total == 27
 
 
 def test_scorer_names_the_wrong_field():
-    ex = load("s5_report_a_rules_extraction.json")
-    ex["cuecs"]["count"] = 11
+    ex = load("sample_soc2_extraction.json")
+    ex["cuecs"]["count"] = 8
     ex["categories"]["in_scope"] = ["Security"]
-    checks = score(ex, load("s5_report_a_ground_truth.json"))
+    checks = score(ex, load("sample_soc2_truth.json"))
     bad = {(c.field, c.key) for c in checks if not c.ok}
     assert bad == {("cuecs", "count"), ("categories", "in_scope")}
 
 
 def test_missing_field_counts_as_wrong_not_crash():
-    ex = load("s5_report_a_rules_extraction.json")
+    ex = load("sample_soc2_extraction.json")
     del ex["auditor"]
-    checks = score(ex, load("s5_report_a_ground_truth.json"))
+    checks = score(ex, load("sample_soc2_truth.json"))
     assert all(not c.ok for c in checks if c.field == "auditor")

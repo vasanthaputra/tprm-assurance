@@ -4,5 +4,6 @@ __pycache__/
 out/
 .venv/
 .env
-# Jev request logs that quote report pages (restricted-use documents); commit the .redacted.json copy instead
-data/runs/**/jev_report_b.json
+
+# Real-report data (restricted-use SOC 2 reports): kept on this machine only, never committed
+private/
