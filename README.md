@@ -12,6 +12,7 @@ Third-party risk teams spend their time on two questions: *is our vendor invento
 | 2. Risk acceptance | Approver by delegated authority; owner; time-boxed expiry; max duration by rating; aging KRI | **Done**: 8 tests |
 | 3. SOC 2 reliance | Extracts period, opinion, scope, subservice carve-outs, CUECs, CSOC criteria, auditor and test results from the PDF, each with its page; reliance rules propose findings; **a human approves or rejects each one** (append-only log, each decision bound to a hash of the extraction so it can't leak onto another report) | **Done**: 6 tests, verified against a real public report |
 | 4. Evaluation | `soc2 score` compares any extraction to hand-verified ground truth, field by field | **Done**: rules extractor = [26/26 fields](data/fixtures/s5_report_a_rules_accuracy.md) on the one public report; the AI paths are not yet measured |
+| 5. Conflict queue | When two extractions of one report disagree (rules vs AI), each disagreement is listed for a person to resolve: take A, take B, or type the value from the report. Append-only log bound to a hash of the pair. `soc2 merge` is refused while a disagreement that decides a reliance rule is open; the gate in `policy.yaml` has no "off" setting | **Done**: 14 tests on synthetic disagreements; not yet run on a real AI reply |
 
 ## Run it
 
@@ -37,7 +38,20 @@ Two-minute version for a demo or interview: [`docs/WALKTHROUGH.md`](docs/WALKTHR
 | **Copy-paste** | a Claude (or other assistant) chat window | `soc2 prompt report.pdf --out prompt.txt`, paste the file into the chat, save the JSON reply, run `soc2 review` on it. No API key. |
 | `--extractor anthropic` | `pip install anthropic` + credentials | Sends the PDF to the API with a strict JSON schema. **Written but not yet run.** |
 
-Whatever produced the extraction, the reliance rules and the human gate are the same. The reviewer's context file (what services you use, which categories you need, which subservice reports and CUEC owners you already have) changes the outcome, and it is your input, not a fact about the vendor.
+Whatever produced the extraction, the reliance rules and the human gate are the same.
+
+### When two extractors disagree
+
+Neither extractor is the record; the report is. Run two (for example rules and copy-paste) and compare them instead of trusting either:
+
+```bash
+python -m tprm_assurance.cli soc2 conflicts rules.json ai.json            # the queue, with BLOCKED or not
+python -m tprm_assurance.cli soc2 resolve rules.json ai.json cuecs.count manual --value 12 --reviewer "your name" --note "12 bullets on page 30"
+python -m tprm_assurance.cli soc2 merge rules.json ai.json --out merged.json   # exit 2 while blocked
+python -m tprm_assurance.cli soc2 review merged.json --context data/sample/soc2_context.yaml
+```
+
+**HIGH** = the field decides whether a reliance rule fires (report type, period, opinion, categories, subservice organisations, CUEC count, exceptions). **LOW** = a page citation or detail text; a test checks that changing any LOW field changes no rule outcome. Differences in capitalisation, spacing or list order are not conflicts; one extractor saying "not found" while the other found a value is. Resolve every conflict before approving findings: the merged file is a new extraction with its own hash, so findings decided on it do not carry over if it is merged again. The reviewer's context file (what services you use, which categories you need, which subservice reports and CUEC owners you already have) changes the outcome, and it is your input, not a fact about the vendor.
 
 Output: [`data/sample/sample_report.md`](data/sample/sample_report.md), an exposure-by-tier summary, findings by rule with their source, then every finding.
 

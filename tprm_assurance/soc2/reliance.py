@@ -155,8 +155,12 @@ def propose(ex: dict, ctx: dict, policy: dict | None = None) -> list[Finding]:
 def to_markdown(ex: dict, findings: list[Finding], ctx: dict) -> str:
     L = [f"# SOC 2 reliance review: {ex.get('source_file')} (as of {ctx['as_of']})", "",
          "**Nothing below is a finding until a reviewer approves it.** Status shows PROPOSED / APPROVED / REJECTED.", "",
-         f"Extraction hash: `{report_hash(ex)}` (decisions are bound to it)", "",
-         "## What the extractor read", "", "| Field | Value | Page |", "|---|---|---|"]
+         f"Extraction hash: `{report_hash(ex)}` (decisions are bound to it)", ""]
+    m = ex.get("_merge")
+    if m:
+        L += [f"Merged from `{m['from'][0]}` and `{m['from'][1]}`: {len(m['resolved'])} disagreement(s) resolved by a reviewer"
+              + (f"; **still open below the {m['gate']} gate, A's value used: {', '.join(m['open'])}**" if m["open"] else "") + ".", ""]
+    L += ["## What the extractor read", "", "| Field | Value | Page |", "|---|---|---|"]
     rt, p, op, c, s, cu, tr, au = (ex.get(k, {}) for k in ("report_type", "period", "opinion", "categories", "subservice_orgs", "cuecs", "test_results", "auditor"))
     L += [f"| Report type | {rt.get('value')} | {rt.get('page')} |",
           f"| Period | {p.get('start')} to {p.get('end')} | {p.get('page')} |",

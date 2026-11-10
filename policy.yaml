@@ -21,6 +21,11 @@ assurance:
                                          # Type II expected". Which tiers "expect" Type II is
                                          # ORG POLICY.
 
+conflicts:                # When two extractions of one SOC 2 report disagree (soc2 conflicts / merge)
+  gate_severity: HIGH     # ORG POLICY. HIGH = merge is refused while a field that decides a reliance
+                          # rule is unresolved; LOW = refused while ANY disagreement is unresolved.
+                          # There is no setting that turns the gate off.
+
 acceptance:               # Module 2: risk acceptance lifecycle
   # Who may accept a risk at each rating. ORG POLICY — the interagency guidance (S1) says the
   # board "may approve or delegate approval" for higher-risk third parties; NIST SP 800-53 PM-28

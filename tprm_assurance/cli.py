@@ -8,6 +8,9 @@
   python -m tprm_assurance.cli soc2 score   <extraction.json> [--truth ground_truth.json] [--out F]
   python -m tprm_assurance.cli demo [--out-dir out]
   python -m tprm_assurance.cli soc2 decide  <extraction.json> <finding_id> approve|reject --reviewer NAME [--note ...] [--decisions log.jsonl]
+  python -m tprm_assurance.cli soc2 conflicts <a.json> <b.json> [--resolutions log.jsonl] [--out F]   (two extractions of one report)
+  python -m tprm_assurance.cli soc2 resolve   <a.json> <b.json> <conflict_id> a|b|manual --reviewer NAME [--value JSON] [--note ...]
+  python -m tprm_assurance.cli soc2 merge     <a.json> <b.json> --out merged.json   (refused while the gate is blocked)
 """
 from __future__ import annotations
 
@@ -73,6 +76,22 @@ def main(argv: list[str] | None = None) -> int:
     dc.add_argument("--reviewer", required=True)
     dc.add_argument("--note", default="")
     dc.add_argument("--decisions", type=Path, default=Path("decisions.jsonl"))
+    cf = soc.add_parser("conflicts", help="list where two extractions of the same report disagree")
+    rs = soc.add_parser("resolve", help="resolve one conflict: take A, take B, or type the value from the report")
+    mg = soc.add_parser("merge", help="build one extraction from the pair; refused while the gate is blocked")
+    for s in (cf, rs, mg):
+        s.add_argument("a_json", type=Path, help="extraction A (usually the rules extractor)")
+        s.add_argument("b_json", type=Path, help="extraction B (e.g. the copy-paste AI reply)")
+        s.add_argument("--resolutions", type=Path, default=Path("conflicts.jsonl"))
+    rs.add_argument("conflict_id")
+    rs.add_argument("choice", choices=["a", "b", "manual"])
+    rs.add_argument("--reviewer", required=True)
+    rs.add_argument("--value", help="JSON value for a manual resolution, e.g. 12 or '[\"Security\"]'")
+    rs.add_argument("--note", default="")
+    for s in (cf, mg):
+        s.add_argument("--policy", type=Path, default=ROOT / "policy.yaml")
+    cf.add_argument("--out", type=Path)
+    mg.add_argument("--out", type=Path, required=True)
 
     args = p.parse_args(argv)
 
@@ -134,6 +153,27 @@ def main(argv: list[str] | None = None) -> int:
         h = report_hash(json.loads(args.extraction_json.read_text(encoding="utf-8")))
         entry = decide(args.decisions, args.finding_id, args.decision, args.reviewer, h, args.note)
         print(json.dumps(entry))
+    elif args.soc2_cmd in ("conflicts", "resolve", "merge"):
+        from .soc2 import conflicts as cq
+        a = json.loads(args.a_json.read_text(encoding="utf-8"))
+        b = json.loads(args.b_json.read_text(encoding="utf-8"))
+        if args.soc2_cmd == "conflicts":
+            gate = cq.gate_severity(load_policy(args.policy))
+            found = cq.apply_resolutions(cq.find_conflicts(a, b), args.resolutions)
+            _emit(cq.to_markdown(a, b, found, gate), args.out, len(found))
+        elif args.soc2_cmd == "resolve":
+            value = json.loads(args.value) if args.value is not None else None
+            print(json.dumps(cq.resolve(args.resolutions, a, b, args.conflict_id, args.choice,
+                                        args.reviewer, value, args.note)))
+        else:
+            try:
+                merged = cq.merge(a, b, args.resolutions, load_policy(args.policy))
+            except cq.GateBlocked as e:
+                print(f"merge refused: {e}")
+                return 2
+            args.out.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            print(f"merged ({len(merged['_merge']['resolved'])} resolved, {len(merged['_merge']['open'])} open below "
+                  f"gate {merged['_merge']['gate']}) -> {args.out}  (next: soc2 review {args.out} --context ...)")
     return 0
 
 
