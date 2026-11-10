@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ rid }} · tprm-assurance{% endblock %}
+{% block body %}
+<p class="muted"><a href="/">Reports</a> / {{ rid }}</p>
+<h1>{{ rid }}</h1>
+
+<div class="card">
+  <div class="tabs">
+    <b>Reading:</b>
+    {% for n in names %}<a class="{{ 'on' if n == ex_name }}" href="/r/{{ rid }}?ex={{ n }}">{{ labels[n] }}</a>{% endfor %}
+    {% if not names %}<span class="muted">no readings yet</span>{% endif %}
+  </div>
+  {% if has_pdf %}
+  <p class="row-form" style="margin-top:12px">
+    <form class="inline" method="post" action="/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="which" value="rules"><button class="ghost" type="submit">Read with rules (free)</button></form>
+    {% if claude_ok %}
+    <form class="inline" method="post" action="/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="which" value="claude-text"><button type="submit">Read with Claude</button></form>
+    <span class="muted">measured cost ≈ $0.003–0.004 per page, about a minute</span>
+    {% else %}<span class="muted">Claude: set ANTHROPIC_API_KEY to enable</span>{% endif %}
+  </p>
+  {% endif %}
+  {% if meta %}<p class="muted">Last Claude run: {{ meta.input_tokens }} in / {{ meta.output_tokens }} out tokens, about ${{ meta.estimated_cost_usd }}.</p>{% endif %}
+  {% if names|length >= 2 %}
+  <p><a href="/r/{{ rid }}/conflicts?a={{ names[0] }}&b={{ names[1] }}"><b>Compare readings →</b></a>
+     <span class="muted">where two readers disagree, a person decides before the merge</span></p>
+  {% endif %}
+</div>
+
+{% if ex %}
+<h2>Proposed findings <span class="muted">· {{ labels[ex_name] }} · extraction hash <code>{{ hash }}</code></span></h2>
+<p class="muted">Nothing below is a finding until a reviewer approves it. Each decision is appended to a log and bound to this extraction's hash.</p>
+<div class="card">
+<table>
+  <tr><th>Rule</th><th>What it means</th><th>Detail</th><th>Page</th><th>Source</th><th>Status</th><th>Decide</th></tr>
+  {% for f in findings %}
+  <tr>
+    <td><code>{{ f.rule }}</code></td><td>{{ f.meaning }}</td><td>{{ f.detail }}</td><td>{{ f.page or "-" }}</td>
+    <td class="muted">{{ f.source }}</td><td><span class="badge {{ f.status }}">{{ f.status }}</span></td>
+    <td>
+      <form method="post" action="/r/{{ rid }}/decide" class="row-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ex" value="{{ ex_name }}">
+        <input type="hidden" name="finding_id" value="{{ f.id }}">
+        <input type="text" name="reviewer" placeholder="your name" required>
+        <input type="text" name="note" placeholder="note">
+        <button class="small" name="decision" value="approve">Approve</button>
+        <button class="small ghost" name="decision" value="reject">Reject</button>
+      </form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">No findings for this reading and context.</td></tr>{% endfor %}
+</table>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2 style="margin-top:0">What the reader extracted</h2>
+    <table>
+      <tr><th>Field</th><th>Value</th><th>Page</th></tr>
+      {% for name, value, page in facts %}
+      <tr><td><code>{{ name }}</code></td>
+          <td>{% if value is iterable and value is not string %}{{ value|join(", ") or "-" }}{% else %}{{ value if value is not none else "-" }}{% endif %}</td>
+          <td>{{ page or "-" }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Your context</h2>
+    <p class="muted">What you use and already hold. It changes which findings apply; it is not a fact about the vendor.</p>
+    <form method="post" action="/r/{{ rid }}/context">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ex" value="{{ ex_name }}">
+      <p>As of <input type="date" name="as_of" value="{{ ctx.as_of }}"></p>
+      <p>Categories we need:<br>
+        {% for c in categories %}<label><input type="checkbox" name="cat_{{ c }}" {{ "checked" if c in ctx.categories_needed }}> {{ c }}</label><br>{% endfor %}</p>
+      <p><label><input type="checkbox" name="expect_type2" {{ "checked" if ctx.expect_type2 }}> We expect a Type 2 report</label><br>
+         <label><input type="checkbox" name="bridge" {{ "checked" if ctx.bridge_letter_on_file }}> Bridge letter on file</label></p>
+      <p>Subservice reports we already hold (one per line):<br>
+        <textarea name="held" rows="3">{{ ctx.subservice_reports_on_file|join("\n") }}</textarea></p>
+      <p>CUECs with an owner: <input type="number" name="cuec_owned" min="0" value="{{ ctx.cuec_owners|length }}"></p>
+      <button type="submit">Save and recalculate</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

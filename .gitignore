@@ -7,3 +7,7 @@ out/
 
 # Real-report data (restricted-use SOC 2 reports): kept on this machine only, never committed
 private/
+
+# Local web app data (uploaded reports, readings, decisions) and local tool config
+workspace/
+.claude/

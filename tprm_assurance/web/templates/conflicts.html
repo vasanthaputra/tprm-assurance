@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Compare readings · {{ rid }}{% endblock %}
+{% block body %}
+<p class="muted"><a href="/">Reports</a> / <a href="/r/{{ rid }}">{{ rid }}</a> / compare readings</p>
+<h1>Where the two readings disagree</h1>
+<p class="muted">Neither reader is the record; the report is. Check the page, then take A, take B, or type the value you read.
+HIGH = the field decides whether a reliance rule fires. LOW = a page number or detail text.</p>
+
+<form method="get" action="/r/{{ rid }}/conflicts" class="row-form card">
+  A <select name="a">{% for n in names %}<option value="{{ n }}" {{ "selected" if n == a }}>{{ labels[n] }}</option>{% endfor %}</select>
+  B <select name="b">{% for n in names %}<option value="{{ n }}" {{ "selected" if n == b }}>{{ labels[n] }}</option>{% endfor %}</select>
+  <button class="ghost" type="submit">Compare</button>
+</form>
+
+{% if blocked %}
+<div class="msg gate">Merge blocked: {{ blocked|length }} open HIGH conflict{{ "s" if blocked|length > 1 }} must be resolved first (gate: {{ gate }}).</div>
+{% else %}
+<div class="msg open">Merge allowed at gate {{ gate }}.</div>
+{% endif %}
+
+<div class="card">
+<table>
+  <tr><th>Field</th><th>Severity</th><th>A: {{ labels[a] }}</th><th>B: {{ labels[b] }}</th><th>Status</th>
+      {% if has_sug %}<th>Jev suggests</th>{% endif %}<th>Resolve</th></tr>
+  {% for c, s in rows %}
+  <tr>
+    <td><code>{{ c.id }}</code></td><td><span class="badge {{ c.severity }}">{{ c.severity }}</span></td>
+    <td>{{ c.a }}</td><td>{{ c.b }}</td>
+    <td><span class="badge {{ c.status }}">{{ c.status }}</span>
+        {% if c.resolution %}<div class="muted">{{ c.resolution.choice }} = {{ c.resolution.value }} · {{ c.resolution.reviewer }}</div>{% endif %}</td>
+    {% if has_sug %}<td>{{ s }}</td>{% endif %}
+    <td>
+      <form method="post" action="/r/{{ rid }}/resolve" class="row-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="b" value="{{ b }}">
+        <input type="hidden" name="conflict_id" value="{{ c.id }}">
+        <select name="choice"><option value="a">take A</option><option value="b">take B</option><option value="manual">type value</option></select>
+        <input type="text" name="value" placeholder='e.g. 9 or ["Security"]'>
+        <input type="text" name="reviewer" placeholder="your name" required>
+        <button class="small" type="submit">Resolve</button>
+      </form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">The two readings agree on every field both report.</td></tr>{% endfor %}
+</table>
+</div>
+
+<p class="row-form">
+  {% if jev_ok %}
+  <form class="inline" method="post" action="/r/{{ rid }}/jev"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="b" value="{{ b }}">
+    <button class="ghost" type="submit">Ask Jev to check the cited pages</button></form>
+  <span class="muted">advice only; costs well under a cent</span>
+  {% else %}<span class="muted">Jev check: needs the report PDF and a TYPESAFE_API_KEY.</span>{% endif %}
+  <form class="inline" method="post" action="/r/{{ rid }}/merge"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="b" value="{{ b }}">
+    <button type="submit">Merge into one reading</button></form>
+</p>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>SOC 2 reliance reviews</h1>
+<p class="muted">Load a vendor's SOC 2 report, read it with the rules extractor and Claude, compare the two readings,
+and approve or reject each proposed finding. Files stay in <code>workspace/</code> on this machine.</p>
+
+<div class="grid">
+  <div class="card">
+    <h2 style="margin-top:0">Reports</h2>
+    {% if reports %}
+    <table>
+      <tr><th>Report</th><th>Readings</th><th>PDF</th></tr>
+      {% for r in reports %}
+      <tr><td><a href="/r/{{ r.rid }}">{{ r.rid }}</a></td>
+          <td>{% for n in r.names %}<span class="badge LOW">{{ labels[n] }}</span> {% else %}<span class="muted">none yet</span>{% endfor %}</td>
+          <td>{{ "yes" if r.pdf else "no (sample)" }}</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No reports yet. Upload one, or start with the fictional sample.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Add a report</h2>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="file" name="file" accept="application/pdf" required>
+      <button type="submit">Upload PDF</button>
+    </form>
+    <p class="muted">PDF only, up to 40 MB. Use reports you are allowed to review.</p>
+    <form method="post" action="/sample">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="ghost" type="submit">Open the fictional sample report</button>
+    </form>
+    <p class="muted">The sample has two readings that disagree, so the conflict queue has something to show.</p>
+    <h2>Services</h2>
+    <p class="muted">Claude API key: <b>{{ "found" if claude else "not set" }}</b> · Jev (TypeSafe) key: <b>{{ "found" if jev else "not set" }}</b><br>
+    Keys are read from this machine's environment and are never shown.</p>
+  </div>
+</div>
+{% endblock %}

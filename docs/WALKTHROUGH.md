@@ -18,3 +18,5 @@
 **Honest limits.** Two real reports, one run per route; the answer keys were read from the page text and are not yet checked by a person. The reports, keys and per-field outputs stay local because SOC 2 reports are restricted use. Sample data is synthetic.
 
 **Demo in one command:** `py -3 -m tprm_assurance.cli demo` writes all three reports to `out/`.
+
+**Live demo.** `python -m tprm_assurance.web`, open the fictional sample: approve a finding, then open *Compare readings* and show the merge blocked until each HIGH disagreement is resolved.

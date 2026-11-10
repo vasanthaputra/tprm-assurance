@@ -64,6 +64,23 @@ Status: measured 2026-11-10 ([results](docs/results_2026-11-10.md)). Planted-err
 
 Output: [`data/sample/sample_report.md`](data/sample/sample_report.md), an exposure-by-tier summary, findings by rule with their source, then every finding.
 
+## Web app (local)
+
+```bash
+pip install -r requirements.txt fastapi uvicorn jinja2 python-multipart
+python -m tprm_assurance.web          # then open http://127.0.0.1:8765
+```
+
+Upload a SOC 2 PDF (or open the fictional sample), read it with the rules extractor and, if `ANTHROPIC_API_KEY` is set,
+with Claude; approve or reject each proposed finding; compare the two readings, ask Jev to check the cited pages
+(`TYPESAFE_API_KEY`), resolve each disagreement and merge. It is a thin layer over the same modules as the command line,
+with no decision logic of its own.
+
+It runs on your machine only, by design: SOC 2 reports are restricted-use documents, and files stay in `workspace/`
+(git-ignored). It answers only on localhost (blocks DNS rebinding), every form carries a per-process token and
+cross-site posts are refused (OWASP synchronizer-token pattern), uploads must be PDFs (checked by content, 40 MB
+limit), state changes redirect so a refresh never repeats a decision, and API keys are never rendered.
+
 ## Where the rules come from
 
 Every rule cites a source in [`SOURCES.md`](SOURCES.md): the 2023 Fed/FDIC/OCC interagency third-party guidance, GDPR Art. 28, and an MIT-licensed practitioner SOC 2 review method. Where a source deliberately leaves a value to the organisation (for example, how often to reassess a medium-risk vendor), [`policy.yaml`](policy.yaml) marks it **ORG POLICY** so you can change it.

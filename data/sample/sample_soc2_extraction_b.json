@@ -1,0 +1,16 @@
+{
+  "_about": "SYNTHETIC second reading of the fictional report in sample_soc2_extraction.json, as an AI extractor might return it: same facts except a CUEC count of 8 instead of 9, only Security read as in scope, and one provider name with different spacing and capitals. Used to demo the conflict queue. Not taken from any real report.",
+  "source_file": "example_vendor_soc2.pdf",
+  "extractor": "claude-text",
+  "report_type": {"value": "SOC2_TYPE2", "page": 1},
+  "period": {"start": "2025-01-01", "end": "2025-06-30", "page": 1},
+  "report_date": {"value": "2025-07-21", "page": 9},
+  "next_report_due": {"value": "2026-07-01", "page": 1},
+  "opinion": {"value": "UNQUALIFIED", "page": 7, "basis": "The opinion states the criteria were met, with no qualification."},
+  "categories": {"in_scope": ["Security"], "also_mentioned": ["Availability", "Confidentiality"], "page": 5},
+  "subservice_orgs": {"values": ["Nimbus cloud(NC)", "Gitworks Inc", "Ledgerly"], "method": "carve-out", "page": 5},
+  "cuecs": {"count": 8, "page": 28},
+  "csoc_criteria": {"values": ["CC6.1", "CC6.4", "CC7.2"], "page": 29},
+  "auditor": {"signer": null, "firm": "Example Assurance LLP", "page": 9},
+  "test_results": {"no_exceptions_noted": 118, "exceptions_noted": 1, "from_page": 33}
+}
