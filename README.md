@@ -4,6 +4,8 @@
 
 Third-party risk teams spend their time on two questions: *is our vendor inventory complete and current?* and *can we rely on this vendor's SOC 2 report?* Most open-source TPRM tools either run the whole GRC programme or summarise SOC 2 reports with AI and assert time savings. tprm-assurance does the reviewer's actual checks, ties every rule to a published source, and (in later modules) measures how often its AI extraction is right.
 
+**Live showcase:** [domaskai.com/projects/tprm](https://domaskai.com/projects/tprm): the method, the measured results (anonymized) and a click-through demo on a fictional report. Source: `site/index.html`, served by a Cloudflare Worker built with `site/build_worker.py`.
+
 ## Status
 
 | Module | What it does | Status |
