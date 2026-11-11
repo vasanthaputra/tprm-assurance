@@ -81,6 +81,14 @@ side, resolve the rows that disagree (take one pass's value or type the value fr
 refused while a disagreement that decides a reliance rule is open. Resolutions are logged and bound to a hash of all
 three readings.
 
+Each field is one row, and under it is the report text the passes point to: the passage on each cited page that best
+matches the values, with the matching words highlighted (`soc2/excerpt.py`). This is plain text search, with no AI and
+nothing sent anywhere. If none of the words are on the cited page, it says so rather than showing an unrelated
+passage. Proposed findings show their passage too. A finding whose reader cited no page gets the first match in the
+report, labelled as a search result. For "exceptions present", that is the first passage pattern code counted, so the
+reviewer can see whether it is a test result or only control wording. Once a row is decided, its form folds behind
+**Change**.
+
 ## Web app (local)
 
 ```bash
@@ -97,6 +105,24 @@ It runs on your machine only, by design: SOC 2 reports are restricted-use docume
 (git-ignored). It answers only on localhost (blocks DNS rebinding), every form carries a per-process token and
 cross-site posts are refused (OWASP synchronizer-token pattern), uploads must be PDFs (checked by content, 40 MB
 limit), state changes redirect so a refresh never repeats a decision, and API keys are never rendered.
+
+### Optional: private access for invited reviewers
+
+The same app can also be served at `https://<your-domain>/projects/tprm/app` behind
+[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) (one-time code to an
+allow-listed email). Cloudflare signs the person in; the app then checks the signed token itself on every request
+(RS256 signature against the team's published keys, the application's audience tag, issuer and expiry), so a request
+that skipped the sign-in is refused even if it reaches the server another way. A request that arrives through
+Cloudflare can never pass as localhost. Decisions made through this path are recorded under the verified email,
+not a typed name. Configure it in `private/web_access.json` (git-ignored):
+
+```json
+{"team_domain": "<team>.cloudflareaccess.com", "aud": "<Access application audience tag>",
+ "hosts": ["<your-domain>", "www.<your-domain>"]}
+```
+
+Without that file the app answers on localhost only. `scripts/run_web.bat` keeps it running (restarts it 10 seconds
+after any exit) for a scheduled task to start at boot.
 
 ## Where the rules come from
 

@@ -1,0 +1,14 @@
+{# The report text behind a value. Segments are escaped by Jinja; only <mark> is ours. #}
+{% macro quote(e) -%}
+<blockquote class="src">
+  <div class="src-head">Page {{ e.page or "?" }}{% if e.by %} · cited by {{ e.by|join(", ") }}{% endif %}{% if not e.cited %} · not cited by the reader; found by searching the report{% endif %}</div>
+  {% if e.note %}<div class="muted">{{ e.note }}</div>{% endif %}
+  {% if e.found -%}
+  <p>{% for t, m in e.segments %}{% if m %}<mark>{{ t }}</mark>{% else %}{{ t }}{% endif %}{% endfor %}</p>
+  {%- elif e.page -%}
+  <p class="muted">None of the value's words, or the wording this kind of field usually has, appear on page {{ e.page }}. Check the PDF.</p>
+  {%- else -%}
+  <p class="muted">No reader cited a page, and the wording this kind of field usually has does not appear in the report.</p>
+  {%- endif %}
+</blockquote>
+{%- endmacro %}

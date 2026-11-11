@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block body %}
 <h1>SOC 2 reliance reviews</h1>
-<p class="muted">Load a vendor's SOC 2 report, read it with the rules extractor and Claude, compare the two readings,
-and approve or reject each proposed finding. Files stay in <code>workspace/</code> on this machine.</p>
+<p class="muted">Load a vendor's SOC 2 report, run it through three passes (pattern code, Jev, Claude), settle the fields where they
+disagree, then approve or reject each proposed finding. Files stay in <code>workspace/</code> on this machine.</p>
 
 <div class="grid">
   <div class="card">
@@ -11,7 +11,7 @@ and approve or reject each proposed finding. Files stay in <code>workspace/</cod
     <table>
       <tr><th>Report</th><th>Readings</th><th>PDF</th></tr>
       {% for r in reports %}
-      <tr><td><a href="/r/{{ r.rid }}">{{ r.rid }}</a></td>
+      <tr><td><a href="{{ base }}/r/{{ r.rid }}">{{ r.rid }}</a></td>
           <td>{% for n in r.names %}<span class="badge LOW">{{ labels[n] }}</span> {% else %}<span class="muted">none yet</span>{% endfor %}</td>
           <td>{{ "yes" if r.pdf else "no (sample)" }}</td></tr>
       {% endfor %}
@@ -20,13 +20,13 @@ and approve or reject each proposed finding. Files stay in <code>workspace/</cod
   </div>
   <div class="card">
     <h2 style="margin-top:0">Add a report</h2>
-    <form method="post" action="/upload" enctype="multipart/form-data">
+    <form method="post" action="{{ base }}/upload" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="file" name="file" accept="application/pdf" required>
       <button type="submit">Upload PDF</button>
     </form>
     <p class="muted">PDF only, up to 40 MB. Use reports you are allowed to review.</p>
-    <form method="post" action="/sample">
+    <form method="post" action="{{ base }}/sample">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="ghost" type="submit">Open the fictional sample report</button>
     </form>

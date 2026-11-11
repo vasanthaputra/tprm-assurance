@@ -1,28 +1,39 @@
 {% extends "base.html" %}
+{% from "_excerpt.html" import quote %}
+{% macro decide_form(f) -%}
+<form method="post" action="{{ base }}/r/{{ rid }}/decide" class="row-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ex" value="{{ ex_name }}">
+  <input type="hidden" name="finding_id" value="{{ f.id }}">
+  {% if user %}<span class="muted">as {{ user }}</span>{% else %}<input type="text" name="reviewer" placeholder="your name" required>{% endif %}
+  <input type="text" name="note" placeholder="note">
+  <button class="small" name="decision" value="approve">Approve</button>
+  <button class="small ghost" name="decision" value="reject">Reject</button>
+</form>
+{%- endmacro %}
 {% block title %}{{ rid }} · tprm-assurance{% endblock %}
 {% block body %}
-<p class="muted"><a href="/">Reports</a> / {{ rid }}</p>
+<p class="muted"><a href="{{ base }}/">Reports</a> / {{ rid }}</p>
 <h1>{{ rid }}</h1>
 
 <div class="card">
   <div class="tabs">
     <b>Reading:</b>
-    {% for n in names %}<a class="{{ 'on' if n == ex_name }}" href="/r/{{ rid }}?ex={{ n }}">{{ labels[n] }}</a>{% endfor %}
+    {% for n in names %}<a class="{{ 'on' if n == ex_name }}" href="{{ base }}/r/{{ rid }}?ex={{ n }}">{{ labels[n] }}</a>{% endfor %}
     {% if not names %}<span class="muted">no readings yet</span>{% endif %}
   </div>
   {% if has_pdf %}
   <p class="row-form" style="margin-top:12px">
-    <form class="inline" method="post" action="/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <form class="inline" method="post" action="{{ base }}/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="which" value="rules"><button class="ghost" type="submit">Read with rules (free)</button></form>
     {% if claude_ok %}
-    <form class="inline" method="post" action="/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <form class="inline" method="post" action="{{ base }}/r/{{ rid }}/extract"><input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="which" value="claude-text"><button type="submit">Read with Claude</button></form>
     <span class="muted">measured cost ≈ $0.003–0.004 per page, about a minute</span>
     {% else %}<span class="muted">Claude: set ANTHROPIC_API_KEY to enable</span>{% endif %}
   </p>
   {% endif %}
   {% if meta %}<p class="muted">Last Claude run: {{ meta.input_tokens }} in / {{ meta.output_tokens }} out tokens, about ${{ meta.estimated_cost_usd }}.</p>{% endif %}
-  <p><a href="/r/{{ rid }}/passes"><b>3-pass review</b></a>
+  <p><a href="{{ base }}/r/{{ rid }}/passes"><b>3-pass review</b></a>
      <span class="muted">pattern code, Jev and Claude read the same report; wherever they disagree, you decide</span></p>
 </div>
 
@@ -33,20 +44,21 @@
 <table>
   <tr><th>Rule</th><th>What it means</th><th>Detail</th><th>Page</th><th>Source</th><th>Status</th><th>Decide</th></tr>
   {% for f in findings %}
-  <tr>
+  {% set q = quotes.get(f.id) %}{% set dd = decided.get(f.id) %}
+  <tr class="{{ 'has-ex' if q }}">
     <td><code>{{ f.rule }}</code></td><td>{{ f.meaning }}</td><td>{{ f.detail }}</td><td>{{ f.page or "-" }}</td>
     <td class="muted">{{ f.source }}</td><td><span class="badge {{ f.status }}">{{ f.status }}</span></td>
     <td>
-      <form method="post" action="/r/{{ rid }}/decide" class="row-form">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ex" value="{{ ex_name }}">
-        <input type="hidden" name="finding_id" value="{{ f.id }}">
-        <input type="text" name="reviewer" placeholder="your name" required>
-        <input type="text" name="note" placeholder="note">
-        <button class="small" name="decision" value="approve">Approve</button>
-        <button class="small ghost" name="decision" value="reject">Reject</button>
-      </form>
+      {% if dd %}<div class="muted">{{ dd.reviewer }}{% if dd.note %}: “{{ dd.note }}”{% endif %}</div>
+        <details class="change"><summary>Change</summary>{{ decide_form(f) }}</details>
+      {% else %}{{ decide_form(f) }}{% endif %}
     </td>
   </tr>
+  {% if q %}
+  <tr class="ex-row"><td colspan="7">
+    <details {{ "open" if f.status == "PROPOSED" }}><summary>Report text, page {{ q.page or "?" }}</summary>{{ quote(q) }}</details>
+  </td></tr>
+  {% endif %}
   {% else %}<tr><td colspan="7" class="muted">No findings for this reading and context.</td></tr>{% endfor %}
 </table>
 </div>
@@ -66,7 +78,7 @@
   <div class="card">
     <h2 style="margin-top:0">Your context</h2>
     <p class="muted">What you use and already hold. It changes which findings apply; it is not a fact about the vendor.</p>
-    <form method="post" action="/r/{{ rid }}/context">
+    <form method="post" action="{{ base }}/r/{{ rid }}/context">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ex" value="{{ ex_name }}">
       <p>As of <input type="date" name="as_of" value="{{ ctx.as_of }}"></p>
       <p>Categories we need:<br>

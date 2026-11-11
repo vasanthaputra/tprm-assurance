@@ -44,10 +44,19 @@
   textarea { width:100%; }
   .row-form { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
   .row-form input[type=text] { width:120px; }
+  tr.has-ex td { border-bottom:none; }
+  tr.ex-row td { padding-top:0; }
+  tr.ex-row summary, details.change summary { cursor:pointer; color:var(--accent); font-size:13px; }
+  details.change[open] summary { margin-bottom:6px; }
+  blockquote.src { margin:6px 0 4px; padding:8px 12px; border-left:3px solid var(--accent); background:#f3f7f7;
+                   font-size:14px; line-height:1.55; max-width:80ch; }
+  blockquote.src p { margin:4px 0 0; }
+  .src-head { font-size:12px; font-weight:600; color:var(--muted); }
+  mark { background:#fff1a8; color:inherit; padding:0 1px; }
 </style>
 </head>
 <body>
-<header><a href="/">tprm-assurance</a><span>local review workspace · runs on this machine only</span></header>
+<header><a href="{{ base }}/">tprm-assurance</a><span>{% if user %}private review workspace · signed in as {{ user }}{% else %}local review workspace · runs on this machine only{% endif %}</span></header>
 <main>
 {% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
 {% if err %}<div class="msg err">{{ err }}</div>{% endif %}

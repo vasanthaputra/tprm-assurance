@@ -25,16 +25,17 @@ from pathlib import Path
 from urllib.parse import quote, urlparse
 
 import yaml
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from ..register import load_policy
 from ..soc2 import conflicts as cq
+from ..soc2 import excerpt as xp
 from ..soc2 import passes as px
 from ..soc2.extract import CATEGORIES as CATEGORIES_ORDER
 from ..soc2.reliance import load_context, propose, report_hash
-from ..soc2.review import apply_decisions, decide
+from ..soc2.review import apply_decisions, decide, load_decisions
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -70,8 +71,12 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40] or "report"
 
 
+BASE = "/projects/tprm/app"     # where the signed-in app lives on domaskai.com
+
+
 def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_factory=None,
-               pages_reader=None, allowed_hosts: set[str] | None = None, policy_path: Path | None = None) -> FastAPI:
+               pages_reader=None, allowed_hosts: set[str] | None = None, policy_path: Path | None = None,
+               access=None) -> FastAPI:
     ws = Path(workspace or ROOT / "workspace").resolve()
     ws.mkdir(parents=True, exist_ok=True)
     policy = load_policy(policy_path or ROOT / "policy.yaml")
@@ -87,15 +92,30 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         from ..soc2.jev_check import make_client as jev_client_factory
 
     app = FastAPI(title="tprm-assurance", docs_url=None, redoc_url=None, openapi_url=None)
+    router = APIRouter()
     app.state.workspace = ws
+    page_cache: dict = {}                  # pdf path -> (mtime_ns, size, pages); reading a 57-page PDF takes ~3.5 s
+    origin_hosts = set(hosts) | (set(access.hosts) if access else set())
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
-        host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]")
-        if host not in hosts:
-            return PlainTextResponse("This app only answers on localhost.", status_code=400)
+        host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()
+        request.state.user = None
+        request.state.base = BASE if request.url.path == BASE or request.url.path.startswith(BASE + "/") else ""
+        via_cloudflare = "cf-ray" in request.headers or "cf-connecting-ip" in request.headers
+        if host in hosts and not via_cloudflare:
+            pass                                               # this machine: no sign-in needed
+        elif access and host in access.hosts:
+            if not request.state.base:
+                return PlainTextResponse("Not found.", status_code=404)
+            try:
+                request.state.user = access.verify(request.headers.get("cf-access-jwt-assertion"))
+            except PermissionError:
+                return PlainTextResponse("Sign in at domaskai.com to use this app.", status_code=403)
+        else:
+            return PlainTextResponse("This app only answers on localhost or through its sign-in.", status_code=400)
         origin = request.headers.get("origin")
-        if request.method == "POST" and origin and urlparse(origin).hostname not in hosts:
+        if request.method == "POST" and origin and urlparse(origin).hostname not in origin_hosts:
             return PlainTextResponse("Cross-site request refused.", status_code=403)
         resp = await call_next(request)
         resp.headers["X-Frame-Options"] = "DENY"
@@ -106,6 +126,13 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         return resp
 
     # ---- helpers ------------------------------------------------------------------------
+    def who(request: Request, typed: str) -> str:
+        """Signed-in requests are recorded under the verified email, whatever was typed."""
+        return request.state.user or typed
+
+    def go(request: Request, path: str) -> RedirectResponse:
+        return RedirectResponse(request.state.base + path, status_code=303)
+
     def check_csrf(token: str) -> None:
         if not secrets.compare_digest(token or "", csrf_secret):
             raise HTTPException(403, "Form token missing or wrong. Reload the page and try again.")
@@ -135,8 +162,14 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
             raw = json.loads((d / "pages.json").read_text(encoding="utf-8"))
             n = max(int(k) for k in raw if k.isdigit())
             return [raw.get(str(i), "") for i in range(1, n + 1)]
-        if (d / "report.pdf").exists():
-            return pages_reader(d / "report.pdf")
+        pdf = d / "report.pdf"
+        if pdf.exists():
+            st = pdf.stat()
+            hit = page_cache.get(str(pdf))
+            if hit is None or hit[:2] != (st.st_mtime_ns, st.st_size):
+                hit = (st.st_mtime_ns, st.st_size, pages_reader(pdf))
+                page_cache[str(pdf)] = hit
+            return hit[2]
         return None
 
     def available(d: Path) -> list[str]:
@@ -146,7 +179,7 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         return bool(os.environ.get(name))
 
     def render(request: Request, tpl: str, status: int = 200, **kw):
-        kw.update(csrf=csrf_secret, labels=LABELS)
+        kw.update(csrf=csrf_secret, labels=LABELS, base=request.state.base, user=request.state.user)
         return templates.TemplateResponse(request, tpl, kw, status_code=status)
 
     def report_page(request: Request, rid: str, ex_name: str | None = None, msg: str = "", err: str = "", status: int = 200):
@@ -157,11 +190,16 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         ex = read_ex(d, ex_name) if ex_name else None
         ctx = context(d)
         findings = apply_decisions(propose(ex, ctx, policy), d / "decisions.jsonl") if ex else []
+        latest = load_decisions(d / "decisions.jsonl")
+        decided = {f.id: latest[(f.report_hash, f.id)] for f in findings if (f.report_hash, f.id) in latest}
+        pages = report_pages(d) if ex else None
+        quotes = {f.id: xp.for_finding(pages, ex, f.rule, f.page) for f in findings} if pages else {}
         facts = [(f"{f}.{k}", (ex.get(f) or {}).get(k), (ex.get(f) or {}).get("page") or (ex.get(f) or {}).get("from_page"))
                  for f, k in FACT_ROWS] if ex else []
         meta_p = d / "claude-text.meta.json"
         return render(request, "report.html", status, rid=rid, names=names, ex_name=ex_name, ex=ex,
                       hash=report_hash(ex) if ex else "", facts=facts, findings=findings, ctx=ctx,
+                      decided=decided, quotes=quotes,
                       categories=CATEGORIES_ORDER, has_pdf=(d / "report.pdf").exists(),
                       claude_ok=has("ANTHROPIC_API_KEY"),
                       meta=json.loads(meta_p.read_text(encoding="utf-8")) if meta_p.exists() else None,
@@ -186,7 +224,7 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
                       jev_ok=(d / "report.pdf").exists() and has("TYPESAFE_API_KEY"), msg=msg, err=err)
 
     # ---- pages --------------------------------------------------------------------------
-    @app.get("/", response_class=HTMLResponse)
+    @router.get("/", response_class=HTMLResponse)
     def home(request: Request):
         reports = []
         for d in sorted(p for p in ws.iterdir() if p.is_dir() and RID.match(p.name)):
@@ -194,18 +232,18 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         return render(request, "home.html", reports=reports,
                       claude=has("ANTHROPIC_API_KEY"), jev=has("TYPESAFE_API_KEY"))
 
-    @app.post("/sample")
-    def add_sample(csrf: str = Form("")):
+    @router.post("/sample")
+    def add_sample(request: Request, csrf: str = Form("")):
         check_csrf(csrf)
         d = ws / "sample-example-vendor"
         d.mkdir(exist_ok=True)
         for src, dst in (("sample_soc2_extraction.json", "rules.json"), ("sample_soc2_extraction_b.json", "claude-text.json"),
                          ("sample_soc2_pages.json", "pages.json")):
             (d / dst).write_text((ROOT / "data" / "sample" / src).read_text(encoding="utf-8"), encoding="utf-8")
-        return RedirectResponse(f"/r/{d.name}?ex=rules", status_code=303)
+        return go(request, f"/r/{d.name}?ex=rules")
 
-    @app.post("/upload")
-    async def upload(file: UploadFile = File(...), csrf: str = Form("")):
+    @router.post("/upload")
+    async def upload(request: Request, file: UploadFile = File(...), csrf: str = Form("")):
         check_csrf(csrf)
         data = await file.read(MAX_UPLOAD + 1)
         if len(data) > MAX_UPLOAD:
@@ -216,13 +254,13 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         d = ws / rid
         d.mkdir(exist_ok=True)
         (d / "report.pdf").write_bytes(data)
-        return RedirectResponse(f"/r/{rid}", status_code=303)
+        return go(request, f"/r/{rid}")
 
-    @app.get("/r/{rid}", response_class=HTMLResponse)
+    @router.get("/r/{rid}", response_class=HTMLResponse)
     def report(request: Request, rid: str, ex: str | None = None, m: str = ""):
         return report_page(request, rid, ex, msg=m[:300])
 
-    @app.post("/r/{rid}/extract", response_class=HTMLResponse)
+    @router.post("/r/{rid}/extract", response_class=HTMLResponse)
     def extract(request: Request, rid: str, which: str = Form(...), csrf: str = Form(""), back: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
@@ -249,10 +287,10 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         data["source_file"] = "report.pdf" if data.get("source_file") is None else data["source_file"]
         (d / f"{which}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
         if back == "passes":
-            return RedirectResponse(f"/r/{rid}/passes?m={quote(msg)}", status_code=303)
-        return RedirectResponse(f"/r/{rid}?ex={which}&m={quote(msg)}", status_code=303)
+            return go(request, f"/r/{rid}/passes?m={quote(msg)}")
+        return go(request, f"/r/{rid}?ex={which}&m={quote(msg)}")
 
-    @app.post("/r/{rid}/context", response_class=HTMLResponse)
+    @router.post("/r/{rid}/context", response_class=HTMLResponse)
     async def save_context(request: Request, rid: str):
         form = await request.form()
         check_csrf(form.get("csrf", ""))
@@ -268,10 +306,9 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
                "subservice_reports_on_file": [s.strip() for s in form.get("held", "").splitlines() if s.strip()],
                "cuec_owners": {i: "assigned" for i in range(1, max(0, owners) + 1)}}
         (d / "context.yaml").write_text(yaml.safe_dump(ctx, sort_keys=False), encoding="utf-8")
-        return RedirectResponse(f"/r/{rid}?ex={quote(str(form.get('ex') or ''))}&m={quote('Context saved. Findings recalculated.')}",
-                                status_code=303)
+        return go(request, f"/r/{rid}?ex={quote(str(form.get('ex') or ''))}&m={quote('Context saved. Findings recalculated.')}")
 
-    @app.post("/r/{rid}/decide", response_class=HTMLResponse)
+    @router.post("/r/{rid}/decide", response_class=HTMLResponse)
     def decide_finding(request: Request, rid: str, ex: str = Form(...), finding_id: str = Form(...),
                        decision: str = Form(...), reviewer: str = Form(""), note: str = Form(""), csrf: str = Form("")):
         check_csrf(csrf)
@@ -283,17 +320,17 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         if finding_id not in ids:
             return report_page(request, rid, ex, err="That finding is not in this reading.", status=400)
         try:
-            decide(d / "decisions.jsonl", finding_id, decision, reviewer, report_hash(data), note)
+            decide(d / "decisions.jsonl", finding_id, decision, who(request, reviewer), report_hash(data), note)
         except ValueError as e:
             return report_page(request, rid, ex, err=str(e), status=400)
         done = f"{ {'approve': 'Approved', 'reject': 'Rejected'}.get(decision, decision)} {finding_id}."
-        return RedirectResponse(f"/r/{rid}?ex={quote(ex)}&m={quote(done)}", status_code=303)
+        return go(request, f"/r/{rid}?ex={quote(ex)}&m={quote(done)}")
 
-    @app.get("/r/{rid}/conflicts", response_class=HTMLResponse)
+    @router.get("/r/{rid}/conflicts", response_class=HTMLResponse)
     def conflicts(request: Request, rid: str, a: str = "rules", b: str = "claude-text", m: str = ""):
         return conflicts_page(request, rid, a, b, msg=m[:300])
 
-    @app.post("/r/{rid}/resolve", response_class=HTMLResponse)
+    @router.post("/r/{rid}/resolve", response_class=HTMLResponse)
     def resolve(request: Request, rid: str, a: str = Form(...), b: str = Form(...), conflict_id: str = Form(...),
                 choice: str = Form(...), reviewer: str = Form(""), value: str = Form(""), note: str = Form(""),
                 csrf: str = Form("")):
@@ -304,12 +341,12 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
             raise HTTPException(404, "No such reading")
         try:
             v = json.loads(value) if choice == "manual" and value.strip() else None
-            cq.resolve(d / "conflicts.jsonl", A, B, conflict_id, choice, reviewer, v, note)
+            cq.resolve(d / "conflicts.jsonl", A, B, conflict_id, choice, who(request, reviewer), v, note)
         except (ValueError, json.JSONDecodeError) as e:
             return conflicts_page(request, rid, a, b, err=f"Not resolved: {e}", status=400)
-        return RedirectResponse(f"/r/{rid}/conflicts?a={quote(a)}&b={quote(b)}", status_code=303)
+        return go(request, f"/r/{rid}/conflicts?a={quote(a)}&b={quote(b)}")
 
-    @app.post("/r/{rid}/jev", response_class=HTMLResponse)
+    @router.post("/r/{rid}/jev", response_class=HTMLResponse)
     def ask_jev(request: Request, rid: str, a: str = Form(...), b: str = Form(...), csrf: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
@@ -325,9 +362,9 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         (d / f"suggestions-{a}-{b}.json").write_text(json.dumps([s.to_record() for s in sug], indent=2), encoding="utf-8")
         asked = sum(1 for s in sug if s.request)
         note = f"Jev checked {len(sug)} open conflicts ({asked} needed a question)."
-        return RedirectResponse(f"/r/{rid}/conflicts?a={quote(a)}&b={quote(b)}&m={quote(note)}", status_code=303)
+        return go(request, f"/r/{rid}/conflicts?a={quote(a)}&b={quote(b)}&m={quote(note)}")
 
-    @app.post("/r/{rid}/merge")
+    @router.post("/r/{rid}/merge")
     def do_merge(request: Request, rid: str, a: str = Form(...), b: str = Form(...), csrf: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
@@ -339,7 +376,7 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         except cq.GateBlocked as e:
             return conflicts_page(request, rid, a, b, err=f"Merge refused: {e}", status=409)
         (d / "merged.json").write_text(json.dumps(merged, indent=2), encoding="utf-8")
-        return RedirectResponse(f"/r/{rid}?ex=merged", status_code=303)
+        return go(request, f"/r/{rid}?ex=merged")
 
     # ---- 3-pass review -----------------------------------------------------------------
     def pass_readings(d: Path) -> dict:
@@ -359,6 +396,26 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         votes = {n: sum(1 for w in present.values() if w == v) for n, v in present.items()}
         return max(present, key=lambda n: (votes[n], n == "claude-text"), default="manual")
 
+    SHORT = {"rules": "pattern code", "jev": "Jev", "claude-text": "Claude"}
+
+    def row_excerpts(r, readings: dict, pages: list[str]) -> list:
+        """The report text behind one field: one excerpt per page the passes cited (at most 3)."""
+        values = [v for v in r.values.values() if v is not px.MISSING]
+        cited: dict[int, list[str]] = {}
+        for n in px.PASSES:
+            pg = xp.page_of((readings.get(n) or {}).get(r.field), r.key) if n in readings else None
+            if pg is not None and r.values.get(n, px.MISSING) is not px.MISSING:
+                cited.setdefault(pg, []).append(SHORT[n])
+        if not cited:
+            e = xp.find(pages, r.field, values, None)
+            return [e] if e.found else []
+        out = []
+        for pg, by in list(cited.items())[:3]:
+            e = xp.find(pages, r.field, values, pg)
+            e.by = by
+            out.append(e)
+        return out
+
     def passes_page(request: Request, rid: str, msg: str = "", err: str = "", status: int = 200):
         d = rdir(rid)
         readings = pass_readings(d)
@@ -370,23 +427,25 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
             except ValueError as e:
                 found, err = [], str(e)
             blocked = px.blocking(found, gate)
+            pages = report_pages(d)
             for r in found:
                 rows.append({"id": r.id, "severity": r.severity, "agree": r.agree, "status": r.status, "note": r.note,
+                             "excerpts": row_excerpts(r, readings, pages) if pages else [],
                              "cells": [(n, show(r.values.get(n, px.MISSING)), n in readings) for n in px.PASSES],
                              "choices": [n for n in px.PASSES if r.values.get(n, px.MISSING) is not px.MISSING],
                              "suggest": majority(r), "resolution": r.resolution})
         rows.sort(key=lambda r: (r["agree"], r["severity"] != "HIGH"))
-        pages_ok = report_pages(d) is not None if readings else False
+        pages_ok = bool(readings) and report_pages(d) is not None
         return render(request, "passes.html", status, rid=rid, readings=readings, rows=rows, gate=gate,
                       blocked=blocked, passes=px.PASSES, has_pdf=(d / "report.pdf").exists(),
                       claude_ok=has("ANTHROPIC_API_KEY"), jev_ok=has("TYPESAFE_API_KEY") and pages_ok,
                       n_open=sum(1 for r in rows if r["status"] == "OPEN"), msg=msg, err=err)
 
-    @app.get("/r/{rid}/passes", response_class=HTMLResponse)
+    @router.get("/r/{rid}/passes", response_class=HTMLResponse)
     def passes_view(request: Request, rid: str, m: str = ""):
         return passes_page(request, rid, msg=m[:300])
 
-    @app.post("/r/{rid}/run-jev", response_class=HTMLResponse)
+    @router.post("/r/{rid}/run-jev", response_class=HTMLResponse)
     def run_jev(request: Request, rid: str, csrf: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
@@ -401,21 +460,21 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         (d / "jev.json").write_text(json.dumps(jev, indent=2), encoding="utf-8")
         answered = sum(1 for f in jev["_jev"]["fields"].values() if f.get("status") == "answered")
         note = f"Jev answered {answered} of {len(px.JEV_FIELDS)} fixed-choice fields."
-        return RedirectResponse(f"/r/{rid}/passes?m={quote(note)}", status_code=303)
+        return go(request, f"/r/{rid}/passes?m={quote(note)}")
 
-    @app.post("/r/{rid}/passes/resolve", response_class=HTMLResponse)
+    @router.post("/r/{rid}/passes/resolve", response_class=HTMLResponse)
     def passes_resolve(request: Request, rid: str, row_id: str = Form(...), choice: str = Form(...),
                        reviewer: str = Form(""), value: str = Form(""), note: str = Form(""), csrf: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
         try:
             v = json.loads(value) if choice == "manual" and value.strip() else None
-            px.resolve(d / "passes.jsonl", pass_readings(d), row_id, choice, reviewer, v, note)
+            px.resolve(d / "passes.jsonl", pass_readings(d), row_id, choice, who(request, reviewer), v, note)
         except (ValueError, json.JSONDecodeError) as e:
             return passes_page(request, rid, err=f"Not resolved: {e}", status=400)
-        return RedirectResponse(f"/r/{rid}/passes", status_code=303)
+        return go(request, f"/r/{rid}/passes")
 
-    @app.post("/r/{rid}/passes/merge")
+    @router.post("/r/{rid}/passes/merge")
     def passes_merge(request: Request, rid: str, csrf: str = Form("")):
         check_csrf(csrf)
         d = rdir(rid)
@@ -426,8 +485,10 @@ def create_app(workspace: Path | None = None, *, claude_runner=None, jev_client_
         except ValueError as e:
             return passes_page(request, rid, err=str(e), status=400)
         (d / "merged.json").write_text(json.dumps(merged, indent=2), encoding="utf-8")
-        return RedirectResponse(f"/r/{rid}?ex=merged&m={quote('Merged the three passes. Findings below use the merged reading.')}", status_code=303)
+        return go(request, f"/r/{rid}?ex=merged&m={quote('Merged the three passes. Findings below use the merged reading.')}")
 
+    app.include_router(router)
+    app.include_router(router, prefix=BASE)
     return app
 
 
@@ -435,4 +496,7 @@ def main() -> None:
     import uvicorn
     load_user_keys()
     print("tprm-assurance web app: http://127.0.0.1:8765  (this machine only; Ctrl+C to stop)")
-    uvicorn.run(create_app(), host="127.0.0.1", port=8765, log_level="warning")
+    from .access import load_guard
+    access = load_guard(ROOT / "private" / "web_access.json")
+    print("sign-in for domaskai.com:", "configured" if access else "not configured (localhost only)")
+    uvicorn.run(create_app(access=access), host="127.0.0.1", port=8765, log_level="warning")
